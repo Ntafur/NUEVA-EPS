@@ -2360,7 +2360,7 @@
     <div class="date-editor-header">
       <div>
         <h2 id="bulkAuthTitle">💡 Cargue masivo de autorizaciones</h2>
-        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional)</i>. Separador <code>;</code> · Fechas: se aceptan <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. Si la fecha se omite, se aplica a <b>todos</b> los nodos con ese código en la factura.</p>
+        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional)</i>; <b>nodo</b> <i>(opcional)</i>; <b>consecutivo</b> <i>(opcional, recomendado)</i>. Separador <code>;</code> · Fechas: se aceptan <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. El campo <code>consecutivo</code> identifica de forma única el registro y evita ambigüedades cuando hay varios numAutorizacion en la misma fecha y servicio.</p>
       </div>
       <button class="btn btn-sm" id="btnCloseBulkAuth" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">✕ Cerrar</button>
     </div>
@@ -2421,6 +2421,7 @@
           3. Carga el CSV editado y revisa el resumen y los registros marcados.<br>
           4. Haz clic en <b>Ajustar</b> para reemplazar el <code>numAutorizacion</code> en cada JSON.<br>
           <span style="color:var(--text3)">La columna <code>fecha</code> es <b>opcional</b>: si está vacía, el cambio se aplica a todos los nodos con ese <code>codigoServicio</code> en la factura indicada (se muestra una fila por cada match para que puedas auditarlo).<br>
+          Las columnas <code>nodo</code> y <code>consecutivo</code> son <b>opcionales</b>: cuando se proporcionan, identifican un registro específico — útil cuando hay varios numAutorizacion para el mismo servicio y la misma fecha (en ese caso, <code>consecutivo</code> tiene prioridad sobre código y fecha).<br>
           Las filas con factura no presente en los JSON cargados (huérfanos) y las sin coincidencia se omiten automáticamente.</span>
         </p>
       </div>
@@ -5963,9 +5964,11 @@ function toDateOnly(raw) {
 }
 
 // Construye un índice por archivo:
-//   byFactura: numFactura -> { fileKey, map, codeMap }
-//   map     : `${code}|${date}` -> [{tipo, idx}]
-//   codeMap : code -> [{tipo, idx}]  (ignora fecha, para CSV sin fecha)
+//   byFactura: numFactura -> { fileKey, map, codeMap, consecMap }
+//   map       : `${code}|${date}` -> [{tipo, idx}]
+//   codeMap   : code -> [{tipo, idx}]  (ignora fecha, para CSV sin fecha)
+//   consecMap : `${tipo}|${consecutivo}` -> {tipo, idx}  (lookup directo por nodo+consecutivo)
+//               y `${consecutivo}` -> [{tipo, idx}]      (cuando no se conoce el nodo)
 function buildBulkAuthIndex() {
   const byFactura = new Map();
   Object.keys(state.files).forEach(fileKey => {
@@ -5974,6 +5977,7 @@ function buildBulkAuthIndex() {
     if (!factura) return;
     const map = new Map();
     const codeMap = new Map();
+    const consecMap = new Map();
     const servicios = f.raw?.usuarios?.[0]?.servicios || {};
     BULK_AUTH_TIPOS.forEach(tipo => {
       const items = servicios[tipo];
@@ -5989,9 +5993,17 @@ function buildBulkAuthIndex() {
           if (!codeMap.has(code)) codeMap.set(code, []);
           codeMap.get(code).push({ tipo, idx });
         }
+        const consec = item.consecutivo;
+        if (consec !== undefined && consec !== null && String(consec).trim() !== '') {
+          const cs = String(consec).trim();
+          consecMap.set(`${tipo}|${cs}`, { tipo, idx });
+          const onlyKey = `|${cs}`;
+          if (!consecMap.has(onlyKey)) consecMap.set(onlyKey, []);
+          consecMap.get(onlyKey).push({ tipo, idx });
+        }
       });
     });
-    byFactura.set(factura, { fileKey, map, codeMap });
+    byFactura.set(factura, { fileKey, map, codeMap, consecMap });
   });
   return byFactura;
 }
@@ -6005,7 +6017,7 @@ function downloadBulkAuthTemplate() {
     return;
   }
   const sep = ';';
-  const header = ['numAutorizacion','numFactura','codigoServicio','fecha'].join(sep);
+  const header = ['numAutorizacion','numFactura','codigoServicio','fecha','nodo','consecutivo'].join(sep);
   const lines = [header];
 
   // Sanitiza un valor para CSV: quita ;, \r, \n
@@ -6031,6 +6043,8 @@ function downloadBulkAuthTemplate() {
           cell(factura),
           cell(code),
           cell(date),
+          cell(tipo),
+          cell(item.consecutivo),
         ].join(sep));
         totalRows++;
       });
@@ -6117,22 +6131,39 @@ function parseAndValidateBulkAuth(text) {
 
   // Detectar cabecera (si existe). Heurística: si el primer registro tiene
   // alguno de los nombres conocidos, lo tratamos como cabecera.
-  const KNOWN_AUTH = /^n(u|ú)m(ero)?\s*autoriz|^numautoriz/i;
-  const KNOWN_FACT = /^n(u|ú)m(ero)?\s*(de\s+)?factur|^numfactur/i;
-  const KNOWN_CODE = /^c(o|ó)d(igo)?(\s*(del\s*)?servic)?|^codigoservicio/i;
-  const KNOWN_DATE = /^fech/i;
+  const KNOWN_AUTH   = /^n(u|ú)m(ero)?\s*autoriz|^numautoriz/i;
+  const KNOWN_FACT   = /^n(u|ú)m(ero)?\s*(de\s+)?factur|^numfactur/i;
+  const KNOWN_CODE   = /^c(o|ó)d(igo)?(\s*(del\s*)?servic)?|^codigoservicio/i;
+  const KNOWN_DATE   = /^fech/i;
+  const KNOWN_NODO   = /^(nodo|tipo|servicio)$/i;
+  const KNOWN_CONSEC = /^(consec(utivo|\.)?|consec)/i;
 
-  let headerCols = null;
+  // Mapeo de columnas: por defecto orden posicional (0..5).
+  let colIdx = { auth: 0, fact: 1, code: 2, date: 3, nodo: 4, consec: 5 };
   let dataStart = 0;
   const first = parsed[0].map(s => String(s || '').trim());
   const isHeader =
     KNOWN_AUTH.test(first[0] || '') ||
     KNOWN_FACT.test(first[1] || '') ||
     KNOWN_CODE.test(first[2] || '') ||
-    KNOWN_DATE.test(first[3] || '');
+    KNOWN_DATE.test(first[3] || '') ||
+    KNOWN_NODO.test(first[4] || '') ||
+    KNOWN_CONSEC.test(first[5] || '');
   if (isHeader) {
-    headerCols = first;
     dataStart = 1;
+    // Permite columnas en cualquier orden si la cabecera está nombrada.
+    const named = { auth: -1, fact: -1, code: -1, date: -1, nodo: -1, consec: -1 };
+    first.forEach((h, i) => {
+      const v = String(h || '').trim();
+      if (named.auth   === -1 && KNOWN_AUTH.test(v))   named.auth   = i;
+      if (named.fact   === -1 && KNOWN_FACT.test(v))   named.fact   = i;
+      if (named.code   === -1 && KNOWN_CODE.test(v))   named.code   = i;
+      if (named.date   === -1 && KNOWN_DATE.test(v))   named.date   = i;
+      if (named.nodo   === -1 && KNOWN_NODO.test(v))   named.nodo   = i;
+      if (named.consec === -1 && KNOWN_CONSEC.test(v)) named.consec = i;
+    });
+    // Solo sobreescribe los índices que se resolvieron por nombre.
+    Object.keys(named).forEach(k => { if (named[k] !== -1) colIdx[k] = named[k]; });
   }
 
   const index = buildBulkAuthIndex();
@@ -6141,12 +6172,14 @@ function parseAndValidateBulkAuth(text) {
   const matchedKeys = new Map(); // `${fileKey}|${tipo}|${idx}` -> [csvRowNumber]
 
   // Construye una fila base con el contexto crudo del CSV
-  const makeBase = (lineNumber, numAuth, numFact, code, date) => ({
+  const makeBase = (lineNumber, numAuth, numFact, code, date, nodoIn = '', consecIn = '') => ({
     lineNumber,
     numAuth,
     numFact,
     code,
     date,
+    nodoIn,                // nodo provisto por el CSV (informativo)
+    consecIn,              // consecutivo provisto por el CSV (informativo)
     status: 'invalid',
     observation: '',
     fileKey: '',
@@ -6178,21 +6211,25 @@ function parseAndValidateBulkAuth(text) {
     return state.files[fileEntry.fileKey].raw.usuarios[0].servicios[pick.tipo][pick.idx];
   };
 
+  const VALID_TIPOS = new Set(BULK_AUTH_TIPOS);
+
   for (let i = dataStart; i < parsed.length; i++) {
     const cols = parsed[i].map(s => String(s || '').trim());
     const lineNumber = i + 1;
-    const numAuth = cols[0] || '';
-    const numFact = cols[1] || '';
-    const code    = cols[2] || '';
-    const dateRaw = cols[3] || '';
-    const date    = toDateOnly(dateRaw);
+    const numAuth   = cols[colIdx.auth]   || '';
+    const numFact   = cols[colIdx.fact]   || '';
+    const code      = cols[colIdx.code]   || '';
+    const dateRaw   = cols[colIdx.date]   || '';
+    const nodoIn    = cols[colIdx.nodo]   || '';
+    const consecIn  = cols[colIdx.consec] || '';
+    const date      = toDateOnly(dateRaw);
 
     // Saltar filas totalmente vacías (defensivo, parseCsvText ya las filtra)
-    if (!numAuth && !numFact && !code && !dateRaw) continue;
+    if (!numAuth && !numFact && !code && !dateRaw && !nodoIn && !consecIn) continue;
 
-    const baseRow = makeBase(lineNumber, numAuth, numFact, code, date);
+    const baseRow = makeBase(lineNumber, numAuth, numFact, code, date, nodoIn, consecIn);
 
-    // Validaciones de formato (fecha es opcional)
+    // Validaciones de formato (fecha, nodo, consecutivo son opcionales)
     if (!numFact) {
       baseRow.observation = 'numFactura vacío';
       rows.push(baseRow); continue;
@@ -6201,14 +6238,18 @@ function parseAndValidateBulkAuth(text) {
       baseRow.observation = 'numAutorizacion vacío';
       rows.push(baseRow); continue;
     }
-    if (!code) {
-      baseRow.observation = 'codigoServicio vacío';
+    if (!code && !consecIn) {
+      baseRow.observation = 'codigoServicio vacío (proporciona código o consecutivo)';
       rows.push(baseRow); continue;
     }
     // Si la fecha viene presente pero no es parseable: inválida.
-    // Si está vacía: se acepta y se usa matching por código solamente.
     if (dateRaw && !date) {
       baseRow.observation = `fecha "${dateRaw}" no reconocida (formatos aceptados: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)`;
+      rows.push(baseRow); continue;
+    }
+    // Si nodo se proporciona, debe ser un tipo válido (consultas/procedimientos/...)
+    if (nodoIn && !VALID_TIPOS.has(nodoIn)) {
+      baseRow.observation = `nodo "${nodoIn}" desconocido (valores válidos: ${[...VALID_TIPOS].join(', ')})`;
       rows.push(baseRow); continue;
     }
 
@@ -6221,13 +6262,64 @@ function parseAndValidateBulkAuth(text) {
     }
     baseRow.fileKey = fileEntry.fileKey;
 
-    // ─── Caso A: fecha provista → match por (codigo, fecha) ───────────────
+    // ─── Caso A (prioridad): consecutivo provisto → lookup directo ─────────
+    // El consecutivo es único por usuario y resuelve el caso "dos numAutorizacion
+    // distintos para el mismo código y misma fecha".
+    if (consecIn) {
+      let pick = null;
+      if (nodoIn) {
+        // Lookup directo por (nodo, consecutivo)
+        pick = fileEntry.consecMap.get(`${nodoIn}|${consecIn}`) || null;
+        if (!pick) {
+          baseRow.status = 'nomatch';
+          baseRow.observation = `Sin coincidencia para nodo "${nodoIn}" + consecutivo "${consecIn}" en la factura`;
+          rows.push(baseRow); continue;
+        }
+      } else {
+        // Sin nodo: buscamos todas las coincidencias por consecutivo
+        const onlyKey = `|${consecIn}`;
+        const matches = fileEntry.consecMap.get(onlyKey) || [];
+        if (!matches.length) {
+          baseRow.status = 'nomatch';
+          baseRow.observation = `Sin coincidencia para consecutivo "${consecIn}" en la factura`;
+          rows.push(baseRow); continue;
+        }
+        if (matches.length > 1) {
+          baseRow.observation = `consecutivo "${consecIn}" aparece en varios nodos (${matches.map(m => m.tipo).join(', ')}); especifica la columna "nodo"`;
+          rows.push(baseRow); continue;
+        }
+        pick = matches[0];
+      }
+
+      const item = claimItem(fileEntry, pick, lineNumber);
+      baseRow.tipo = pick.tipo;
+      baseRow.idx = pick.idx;
+      baseRow.currentAuth = item.numAutorizacion;
+      baseRow.consecutivo = item.consecutivo ?? '';
+      // Si la fila del CSV trae también código/fecha, validamos consistencia (informativo)
+      const itemCode = String(getServiceCode(item, pick.tipo) || '').trim();
+      const itemDate = toDateOnly(getDate(item, pick.tipo));
+      const warns = [];
+      if (code && itemCode && code !== itemCode) warns.push(`código CSV "${code}" ≠ código JSON "${itemCode}"`);
+      if (date && itemDate && date !== itemDate) warns.push(`fecha CSV "${date}" ≠ fecha JSON "${itemDate}"`);
+      baseRow.status = 'ok';
+      baseRow.observation = okObservation(numAuth, item.numAutorizacion, warns.length ? `match por consecutivo · ${warns.join('; ')}` : 'match por consecutivo');
+      // Reflejar fecha real (informativa) si el CSV no la traía
+      if (!baseRow.date && itemDate) baseRow.date = itemDate;
+      rows.push(baseRow);
+      continue;
+    }
+
+    // ─── Caso B: fecha provista → match por (codigo, fecha) [+ nodo opcional] ─
     if (date) {
       const key = `${code}|${date}`;
-      const candidates = fileEntry.map.get(key);
-      if (!candidates || !candidates.length) {
+      let candidates = fileEntry.map.get(key) || [];
+      if (nodoIn) candidates = candidates.filter(c => c.tipo === nodoIn);
+      if (!candidates.length) {
         baseRow.status = 'nomatch';
-        baseRow.observation = `Sin coincidencia para código "${code}" + fecha "${date}" en la factura`;
+        baseRow.observation = nodoIn
+          ? `Sin coincidencia para nodo "${nodoIn}" + código "${code}" + fecha "${date}" en la factura`
+          : `Sin coincidencia para código "${code}" + fecha "${date}" en la factura`;
         rows.push(baseRow); continue;
       }
 
@@ -6243,25 +6335,31 @@ function parseAndValidateBulkAuth(text) {
       baseRow.currentAuth = item.numAutorizacion;
       baseRow.consecutivo = item.consecutivo ?? '';
       baseRow.status = 'ok';
-      baseRow.observation = okObservation(numAuth, item.numAutorizacion);
+      const ambiguityNote = candidates.length > 1
+        ? ` (atención: ${candidates.length} nodos comparten código+fecha; usa "consecutivo" para precisión)`
+        : '';
+      baseRow.observation = okObservation(numAuth, item.numAutorizacion) + ambiguityNote;
       rows.push(baseRow);
       continue;
     }
 
-    // ─── Caso B: fecha vacía → match por código en todos los nodos ───────
+    // ─── Caso C: fecha vacía → match por código en todos los nodos ───────
     // Comportamiento: se expande la línea del CSV en una fila por cada nodo
     // del archivo que tenga ese código. Esto permite reemplazar la
     // autorización para un servicio en bloque sin necesidad de fecha.
-    const codeCandidates = fileEntry.codeMap.get(code);
-    if (!codeCandidates || !codeCandidates.length) {
+    let codeCandidates = fileEntry.codeMap.get(code) || [];
+    if (nodoIn) codeCandidates = codeCandidates.filter(c => c.tipo === nodoIn);
+    if (!codeCandidates.length) {
       baseRow.status = 'nomatch';
-      baseRow.observation = `Sin coincidencia para código "${code}" en la factura (fecha vacía)`;
+      baseRow.observation = nodoIn
+        ? `Sin coincidencia para nodo "${nodoIn}" + código "${code}" en la factura (fecha vacía)`
+        : `Sin coincidencia para código "${code}" en la factura (fecha vacía)`;
       rows.push(baseRow); continue;
     }
 
     const total = codeCandidates.length;
     codeCandidates.forEach((c, idxInExpansion) => {
-      const r = makeBase(lineNumber, numAuth, numFact, code, '');
+      const r = makeBase(lineNumber, numAuth, numFact, code, '', nodoIn, '');
       r.fileKey = fileEntry.fileKey;
       r.expanded = total > 1;
       const item = claimItem(fileEntry, c, lineNumber);
@@ -6426,12 +6524,13 @@ function exportBulkAuthReport() {
     return;
   }
   const sep = ';';
-  const header = ['linea','numAutorizacion','numFactura','codigoServicio','fecha','archivo','nodo','consecutivo','autorizacionActual','estado','observacion'].join(sep);
+  const header = ['linea','numAutorizacion','numFactura','codigoServicio','fecha','nodoCsv','consecutivoCsv','archivo','nodo','consecutivo','autorizacionActual','estado','observacion'].join(sep);
   const cell = v => String(v == null ? '' : v).replace(/[;\r\n]+/g, ' ').trim();
   const lines = [header];
   bulkAuthState.rows.forEach(r => {
     lines.push([
       r.lineNumber, r.numAuth, r.numFact, r.code, r.date,
+      r.nodoIn || '', r.consecIn || '',
       r.fileKey ? getFilename(r.fileKey) : '',
       r.tipo || '', r.consecutivo, r.currentAuth ?? '',
       r.status, r.observation,
