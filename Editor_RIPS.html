@@ -2360,7 +2360,7 @@
     <div class="date-editor-header">
       <div>
         <h2 id="bulkAuthTitle">💡 Cargue masivo de autorizaciones</h2>
-        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional — YYYY-MM-DD)</i>. Separador <code>;</code> · Si la fecha se omite, se aplica a <b>todos</b> los nodos con ese código en la factura.</p>
+        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional)</i>. Separador <code>;</code> · Fechas: se aceptan <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. Si la fecha se omite, se aplica a <b>todos</b> los nodos con ese código en la factura.</p>
       </div>
       <button class="btn btn-sm" id="btnCloseBulkAuth" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">✕ Cerrar</button>
     </div>
@@ -5912,12 +5912,54 @@ function resolveFileNumFactura(f) {
     || '';
 }
 
-// Devuelve YYYY-MM-DD desde un valor RIPS (puede traer hora).
+// Devuelve YYYY-MM-DD desde un valor RIPS o CSV. Soporta múltiples formatos
+// porque Excel suele exportar fechas en formato regional (DD/MM/YYYY en es-CO):
+//   - YYYY-MM-DD            (ISO, formato canónico RIPS)
+//   - YYYY-MM-DD HH:mm[:ss] (ISO con hora)
+//   - YYYY-MM-DDTHH:mm[:ss] (ISO con T)
+//   - YYYY/MM/DD
+//   - DD/MM/YYYY            (Excel locale ES)
+//   - D/M/YYYY              (sin ceros a la izquierda)
+//   - DD-MM-YYYY            (alternativa común)
+//   - DD.MM.YYYY            (Excel locale DE/varios)
+// Devuelve '' cuando no reconoce el formato o el rango es inválido.
 function toDateOnly(raw) {
   if (raw == null) return '';
   const s = String(raw).trim();
-  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
-  return m ? m[1] : '';
+  if (!s) return '';
+
+  const pad2 = n => String(n).padStart(2, '0');
+  const finalize = (y, mo, d) => {
+    const yi = parseInt(y, 10), mi = parseInt(mo, 10), di = parseInt(d, 10);
+    if (!yi || mi < 1 || mi > 12 || di < 1 || di > 31) return '';
+    // Verificación día válido para el mes (rechaza 31/02 etc.)
+    const dt = new Date(Date.UTC(yi, mi - 1, di));
+    if (dt.getUTCFullYear() !== yi || dt.getUTCMonth() !== mi - 1 || dt.getUTCDate() !== di) return '';
+    return `${yi}-${pad2(mi)}-${pad2(di)}`;
+  };
+
+  let m;
+  // 1) ISO YYYY-MM-DD (posible separador T/espacio + hora)
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T].*)?$/);
+  if (m) return finalize(m[1], m[2], m[3]);
+
+  // 2) YYYY/MM/DD
+  m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:[ T].*)?$/);
+  if (m) return finalize(m[1], m[2], m[3]);
+
+  // 3) DD/MM/YYYY (Excel locale)
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return finalize(m[3], m[2], m[1]);
+
+  // 4) DD-MM-YYYY (no se solapa con ISO porque ISO empieza con 4 dígitos)
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) return finalize(m[3], m[2], m[1]);
+
+  // 5) DD.MM.YYYY
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) return finalize(m[3], m[2], m[1]);
+
+  return '';
 }
 
 // Construye un índice por archivo:
@@ -6163,10 +6205,10 @@ function parseAndValidateBulkAuth(text) {
       baseRow.observation = 'codigoServicio vacío';
       rows.push(baseRow); continue;
     }
-    // Si la fecha está presente pero no es parseable como YYYY-MM-DD: inválida.
-    // Si está vacía (dateRaw === ''): se acepta y se usa matching por código solamente.
+    // Si la fecha viene presente pero no es parseable: inválida.
+    // Si está vacía: se acepta y se usa matching por código solamente.
     if (dateRaw && !date) {
-      baseRow.observation = `fecha inválida "${dateRaw}" (esperada YYYY-MM-DD)`;
+      baseRow.observation = `fecha "${dateRaw}" no reconocida (formatos aceptados: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)`;
       rows.push(baseRow); continue;
     }
 
