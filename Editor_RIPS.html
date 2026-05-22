@@ -2360,7 +2360,7 @@
     <div class="date-editor-header">
       <div>
         <h2 id="bulkAuthTitle">💡 Cargue masivo de autorizaciones</h2>
-        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional)</i>; <b>nodo</b> <i>(opcional)</i>; <b>consecutivo</b> <i>(opcional, recomendado)</i>. Separador <code>;</code> · Fechas: se aceptan <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. El campo <code>consecutivo</code> identifica de forma única el registro y evita ambigüedades cuando hay varios numAutorizacion en la misma fecha y servicio.</p>
+        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. <b>6 columnas obligatorias</b>: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b>; <b>nodo</b>; <b>consecutivo</b>. Separador <code>;</code> · Fechas: <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. <code>nodo</code> + <code>consecutivo</code> identifican de forma única cada registro y evitan ambigüedades cuando hay varios numAutorizacion en la misma fecha y servicio.</p>
       </div>
       <button class="btn btn-sm" id="btnCloseBulkAuth" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">✕ Cerrar</button>
     </div>
@@ -2420,8 +2420,7 @@
           2. Edita la columna <code>numAutorizacion</code> con los valores nuevos.<br>
           3. Carga el CSV editado y revisa el resumen y los registros marcados.<br>
           4. Haz clic en <b>Ajustar</b> para reemplazar el <code>numAutorizacion</code> en cada JSON.<br>
-          <span style="color:var(--text3)">La columna <code>fecha</code> es <b>opcional</b>: si está vacía, el cambio se aplica a todos los nodos con ese <code>codigoServicio</code> en la factura indicada (se muestra una fila por cada match para que puedas auditarlo).<br>
-          Las columnas <code>nodo</code> y <code>consecutivo</code> son <b>opcionales</b>: cuando se proporcionan, identifican un registro específico — útil cuando hay varios numAutorizacion para el mismo servicio y la misma fecha (en ese caso, <code>consecutivo</code> tiene prioridad sobre código y fecha).<br>
+          <span style="color:var(--text3)">Las 6 columnas son <b>obligatorias</b>. <code>nodo</code> + <code>consecutivo</code> identifican el registro de forma única (resuelven el caso de varios numAutorizacion para el mismo código y fecha).<br>
           Las filas con factura no presente en los JSON cargados (huérfanos) y las sin coincidencia se omiten automáticamente.</span>
         </p>
       </div>
@@ -6229,26 +6228,25 @@ function parseAndValidateBulkAuth(text) {
 
     const baseRow = makeBase(lineNumber, numAuth, numFact, code, date, nodoIn, consecIn);
 
-    // Validaciones de formato (fecha, nodo, consecutivo son opcionales)
-    if (!numFact) {
-      baseRow.observation = 'numFactura vacío';
+    // Validaciones de formato — las 6 columnas son obligatorias para garantizar
+    // unicidad y evitar duplicados.
+    const missing = [];
+    if (!numAuth)  missing.push('numAutorizacion');
+    if (!numFact)  missing.push('numFactura');
+    if (!code)     missing.push('codigoServicio');
+    if (!dateRaw)  missing.push('fecha');
+    if (!nodoIn)   missing.push('nodo');
+    if (!consecIn) missing.push('consecutivo');
+    if (missing.length) {
+      baseRow.observation = `Faltan columna(s) obligatoria(s): ${missing.join(', ')}`;
       rows.push(baseRow); continue;
     }
-    if (!numAuth) {
-      baseRow.observation = 'numAutorizacion vacío';
-      rows.push(baseRow); continue;
-    }
-    if (!code && !consecIn) {
-      baseRow.observation = 'codigoServicio vacío (proporciona código o consecutivo)';
-      rows.push(baseRow); continue;
-    }
-    // Si la fecha viene presente pero no es parseable: inválida.
-    if (dateRaw && !date) {
+    // Si la fecha viene pero no es parseable: inválida.
+    if (!date) {
       baseRow.observation = `fecha "${dateRaw}" no reconocida (formatos aceptados: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)`;
       rows.push(baseRow); continue;
     }
-    // Si nodo se proporciona, debe ser un tipo válido (consultas/procedimientos/...)
-    if (nodoIn && !VALID_TIPOS.has(nodoIn)) {
+    if (!VALID_TIPOS.has(nodoIn)) {
       baseRow.observation = `nodo "${nodoIn}" desconocido (valores válidos: ${[...VALID_TIPOS].join(', ')})`;
       rows.push(baseRow); continue;
     }
@@ -6262,120 +6260,30 @@ function parseAndValidateBulkAuth(text) {
     }
     baseRow.fileKey = fileEntry.fileKey;
 
-    // ─── Caso A (prioridad): consecutivo provisto → lookup directo ─────────
-    // El consecutivo es único por usuario y resuelve el caso "dos numAutorizacion
-    // distintos para el mismo código y misma fecha".
-    if (consecIn) {
-      let pick = null;
-      if (nodoIn) {
-        // Lookup directo por (nodo, consecutivo)
-        pick = fileEntry.consecMap.get(`${nodoIn}|${consecIn}`) || null;
-        if (!pick) {
-          baseRow.status = 'nomatch';
-          baseRow.observation = `Sin coincidencia para nodo "${nodoIn}" + consecutivo "${consecIn}" en la factura`;
-          rows.push(baseRow); continue;
-        }
-      } else {
-        // Sin nodo: buscamos todas las coincidencias por consecutivo
-        const onlyKey = `|${consecIn}`;
-        const matches = fileEntry.consecMap.get(onlyKey) || [];
-        if (!matches.length) {
-          baseRow.status = 'nomatch';
-          baseRow.observation = `Sin coincidencia para consecutivo "${consecIn}" en la factura`;
-          rows.push(baseRow); continue;
-        }
-        if (matches.length > 1) {
-          baseRow.observation = `consecutivo "${consecIn}" aparece en varios nodos (${matches.map(m => m.tipo).join(', ')}); especifica la columna "nodo"`;
-          rows.push(baseRow); continue;
-        }
-        pick = matches[0];
-      }
-
-      const item = claimItem(fileEntry, pick, lineNumber);
-      baseRow.tipo = pick.tipo;
-      baseRow.idx = pick.idx;
-      baseRow.currentAuth = item.numAutorizacion;
-      baseRow.consecutivo = item.consecutivo ?? '';
-      // Si la fila del CSV trae también código/fecha, validamos consistencia (informativo)
-      const itemCode = String(getServiceCode(item, pick.tipo) || '').trim();
-      const itemDate = toDateOnly(getDate(item, pick.tipo));
-      const warns = [];
-      if (code && itemCode && code !== itemCode) warns.push(`código CSV "${code}" ≠ código JSON "${itemCode}"`);
-      if (date && itemDate && date !== itemDate) warns.push(`fecha CSV "${date}" ≠ fecha JSON "${itemDate}"`);
-      baseRow.status = 'ok';
-      baseRow.observation = okObservation(numAuth, item.numAutorizacion, warns.length ? `match por consecutivo · ${warns.join('; ')}` : 'match por consecutivo');
-      // Reflejar fecha real (informativa) si el CSV no la traía
-      if (!baseRow.date && itemDate) baseRow.date = itemDate;
-      rows.push(baseRow);
-      continue;
-    }
-
-    // ─── Caso B: fecha provista → match por (codigo, fecha) [+ nodo opcional] ─
-    if (date) {
-      const key = `${code}|${date}`;
-      let candidates = fileEntry.map.get(key) || [];
-      if (nodoIn) candidates = candidates.filter(c => c.tipo === nodoIn);
-      if (!candidates.length) {
-        baseRow.status = 'nomatch';
-        baseRow.observation = nodoIn
-          ? `Sin coincidencia para nodo "${nodoIn}" + código "${code}" + fecha "${date}" en la factura`
-          : `Sin coincidencia para código "${code}" + fecha "${date}" en la factura`;
-        rows.push(baseRow); continue;
-      }
-
-      // Si hay múltiples candidatos (mismo código y fecha en el archivo),
-      // tomamos el primero "libre". Si todos están reclamados, reutilizamos
-      // el primero y marcaremos conflicto al final.
-      let pick = candidates.find(c => !matchedKeys.has(`${fileEntry.fileKey}|${c.tipo}|${c.idx}`));
-      if (!pick) pick = candidates[0];
-      const item = claimItem(fileEntry, pick, lineNumber);
-
-      baseRow.tipo = pick.tipo;
-      baseRow.idx = pick.idx;
-      baseRow.currentAuth = item.numAutorizacion;
-      baseRow.consecutivo = item.consecutivo ?? '';
-      baseRow.status = 'ok';
-      const ambiguityNote = candidates.length > 1
-        ? ` (atención: ${candidates.length} nodos comparten código+fecha; usa "consecutivo" para precisión)`
-        : '';
-      baseRow.observation = okObservation(numAuth, item.numAutorizacion) + ambiguityNote;
-      rows.push(baseRow);
-      continue;
-    }
-
-    // ─── Caso C: fecha vacía → match por código en todos los nodos ───────
-    // Comportamiento: se expande la línea del CSV en una fila por cada nodo
-    // del archivo que tenga ese código. Esto permite reemplazar la
-    // autorización para un servicio en bloque sin necesidad de fecha.
-    let codeCandidates = fileEntry.codeMap.get(code) || [];
-    if (nodoIn) codeCandidates = codeCandidates.filter(c => c.tipo === nodoIn);
-    if (!codeCandidates.length) {
+    // Match único por (nodo, consecutivo). Garantiza unicidad y elimina
+    // cualquier ambigüedad por filas duplicadas (mismo código+fecha).
+    const pick = fileEntry.consecMap.get(`${nodoIn}|${consecIn}`) || null;
+    if (!pick) {
       baseRow.status = 'nomatch';
-      baseRow.observation = nodoIn
-        ? `Sin coincidencia para nodo "${nodoIn}" + código "${code}" en la factura (fecha vacía)`
-        : `Sin coincidencia para código "${code}" en la factura (fecha vacía)`;
+      baseRow.observation = `Sin coincidencia para nodo "${nodoIn}" + consecutivo "${consecIn}" en la factura`;
       rows.push(baseRow); continue;
     }
 
-    const total = codeCandidates.length;
-    codeCandidates.forEach((c, idxInExpansion) => {
-      const r = makeBase(lineNumber, numAuth, numFact, code, '', nodoIn, '');
-      r.fileKey = fileEntry.fileKey;
-      r.expanded = total > 1;
-      const item = claimItem(fileEntry, c, lineNumber);
-      r.tipo = c.tipo;
-      r.idx = c.idx;
-      r.currentAuth = item.numAutorizacion;
-      r.consecutivo = item.consecutivo ?? '';
-      // Mostrar la fecha real del nodo encontrado (informativa, no usada para match)
-      r.date = toDateOnly(getDate(item, c.tipo));
-      r.status = 'ok';
-      const expNote = total > 1
-        ? `expandido (${idxInExpansion + 1} de ${total}) por fecha vacía`
-        : 'sin fecha en CSV: match por código';
-      r.observation = okObservation(numAuth, item.numAutorizacion, expNote);
-      rows.push(r);
-    });
+    const item = claimItem(fileEntry, pick, lineNumber);
+    baseRow.tipo = pick.tipo;
+    baseRow.idx = pick.idx;
+    baseRow.currentAuth = item.numAutorizacion;
+    baseRow.consecutivo = item.consecutivo ?? '';
+
+    // Validación de consistencia: código y fecha del CSV deben coincidir con el JSON.
+    const itemCode = String(getServiceCode(item, pick.tipo) || '').trim();
+    const itemDate = toDateOnly(getDate(item, pick.tipo));
+    const warns = [];
+    if (itemCode && code !== itemCode) warns.push(`código CSV "${code}" ≠ código JSON "${itemCode}"`);
+    if (itemDate && date !== itemDate) warns.push(`fecha CSV "${date}" ≠ fecha JSON "${itemDate}"`);
+    baseRow.status = 'ok';
+    baseRow.observation = okObservation(numAuth, item.numAutorizacion, warns.length ? warns.join('; ') : '');
+    rows.push(baseRow);
   }
 
   // Tras pasar todas las filas, marcar duplicados de destino reclamados por

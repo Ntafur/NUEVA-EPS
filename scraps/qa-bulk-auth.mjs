@@ -165,22 +165,41 @@ check('CSV nuevo: resuelve consecutivo A correctamente',
   r1[0] && String(r1[0].consecutivo) === String(mutated.a.consec) && r1[0].tipo === mutated.tipo);
 check('CSV nuevo: resuelve consecutivo B correctamente (distinto idx)',
   r1[1] && String(r1[1].consecutivo) === String(mutated.b.consec) && r1[1].idx !== r1[0].idx);
-check('CSV nuevo: la observación menciona "match por consecutivo"',
-  r1.every(r => /consecutivo/i.test(r.observation)));
+check('CSV nuevo: observación indica "Listo"',
+  r1.every(r => /listo/i.test(r.observation)));
 
-// 4) CSV antiguo (sin nodo/consecutivo) → debe seguir funcionando.
+// 4) CSV antiguo (4 columnas, sin nodo/consecutivo) → ahora debe rechazarse
+// porque las 6 columnas son obligatorias.
 const csvAntiguo = [
   'numAutorizacion;numFactura;codigoServicio;fecha',
   `700000099;${mutated.factura};${mutated.code};${mutated.date}`,
 ].join('\r\n');
 const r2 = await page.evaluate((csv) => window.__bulkAuth.parseAndValidateBulkAuth(csv), csvAntiguo);
-console.log('\n=== Resultado CSV antiguo (sin consecutivo) ===');
+console.log('\n=== Resultado CSV antiguo (4 columnas) ===');
 console.log(JSON.stringify(r2, null, 2));
-check('CSV antiguo: 1 fila ok', r2.length === 1 && r2[0].status === 'ok');
-// Con duplicados, ahora avisamos en la observación
-check('CSV antiguo: observación marca ambigüedad por código+fecha cuando hay duplicados',
-  r2[0] && /comparten código\+fecha|consecutivo/i.test(r2[0].observation),
+check('CSV antiguo (4 cols): rechazado como inválido', r2.length === 1 && r2[0].status === 'invalid',
   `obs="${r2[0]?.observation}"`);
+check('CSV antiguo (4 cols): observación menciona "nodo" y "consecutivo" faltantes',
+  /nodo/i.test(r2[0]?.observation || '') && /consecutivo/i.test(r2[0]?.observation || ''),
+  `obs="${r2[0]?.observation}"`);
+
+// 4b) CSV 6 columnas pero con consecutivo vacío → rechazo
+const csvConsecVacio = [
+  'numAutorizacion;numFactura;codigoServicio;fecha;nodo;consecutivo',
+  `700000098;${mutated.factura};${mutated.code};${mutated.date};${mutated.tipo};`,
+].join('\r\n');
+const r2b = await page.evaluate((csv) => window.__bulkAuth.parseAndValidateBulkAuth(csv), csvConsecVacio);
+check('consecutivo vacío → invalid', r2b[0]?.status === 'invalid' && /consecutivo/i.test(r2b[0]?.observation || ''),
+  `obs="${r2b[0]?.observation}"`);
+
+// 4c) Fecha vacía → ahora también es rechazo (era opcional antes)
+const csvFechaVacia = [
+  'numAutorizacion;numFactura;codigoServicio;fecha;nodo;consecutivo',
+  `700000097;${mutated.factura};${mutated.code};;${mutated.tipo};${mutated.a.consec}`,
+].join('\r\n');
+const r2c = await page.evaluate((csv) => window.__bulkAuth.parseAndValidateBulkAuth(csv), csvFechaVacia);
+check('fecha vacía → invalid (ahora obligatoria)', r2c[0]?.status === 'invalid' && /fecha/i.test(r2c[0]?.observation || ''),
+  `obs="${r2c[0]?.observation}"`);
 
 // 5) nodo inválido
 const csvNodoMalo = [
