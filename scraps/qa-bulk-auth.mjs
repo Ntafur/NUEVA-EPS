@@ -20,11 +20,11 @@ import { dirname, resolve as pathResolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = pathResolve(__dirname, '..');
 const HTML = `file://${ROOT}/Editor_RIPS.html`;
-const UPLOADS = '/root/.claude/uploads/589854fc-7cc3-4801-a085-134bfb9c0230';
+const UPLOADS = '/root/.claude/uploads/d4b34822-0380-517a-ab4d-ae681926a7b6';
 const FILES = [
-  `${UPLOADS}/c2556424-11303189.json`,
-  `${UPLOADS}/a77da92d-11304022.json`,
-  `${UPLOADS}/30c729b9-11300466.json`,
+  `${UPLOADS}/55724d74-860035992_11492424_rips.json`,
+  `${UPLOADS}/27a20cb2-860035992_11492432_rips.json`,
+  `${UPLOADS}/a9a48b86-860035992_11492418_rips.json`,
 ];
 
 const rawJsons = FILES.map(p => ({ name: p.split('/').pop(), raw: JSON.parse(readFileSync(p, 'utf-8')) }));
