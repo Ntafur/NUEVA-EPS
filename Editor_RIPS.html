@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/7z-wasm@1.2.0/7zz.umd.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
@@ -319,6 +320,81 @@
     gap: 6px;
     flex-wrap: wrap;
     align-items: center;
+  }
+
+  /* Barra de selección de archivos para "Descargar todos (7z)" */
+  .file-select-toolbar {
+    padding: 8px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .file-select-toolbar .fst-actions {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .fst-btn {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .005em;
+    padding: 5px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    transition: background .14s, color .14s, border-color .14s, box-shadow .14s;
+    white-space: nowrap;
+  }
+  /* Ícono guía dentro de cada botón (check para "todos", punto para "modificados") */
+  .fst-btn .fst-ic {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fst-btn .fst-ic svg { width: 12px; height: 12px; display: block; }
+  .fst-btn .fst-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .fst-btn.is-all .fst-ic { color: var(--brand-navy); }
+  .fst-btn.is-mod .fst-ic { color: var(--warn); }
+  /* Sombreado (hover/focus) → ROJO de marca */
+  .fst-btn:hover,
+  .fst-btn:focus-visible {
+    background: rgba(228, 0, 70, .10);
+    border-color: rgba(228, 0, 70, .40);
+    color: var(--brand-red);
+    box-shadow: 0 2px 8px rgba(228, 0, 70, .16);
+  }
+  .fst-btn:hover .fst-ic,
+  .fst-btn:focus-visible .fst-ic { color: var(--brand-red); }
+  .fst-btn:active { transform: translateY(1px); }
+
+  /* Casilla de validación dentro de cada archivo cargado */
+  .file-item-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+  }
+  .file-item-check {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 1px 0 0;
+    cursor: pointer;
+    accent-color: var(--brand-red);
+  }
+  .file-item-top .file-item-name {
+    flex: 1 1 auto;
+    margin-bottom: 0;
   }
   .badge {
     font-size: 10px;
@@ -915,7 +991,16 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Evita que los grupos se compriman cuando la barra tiene muchos controles
+       (al agregarse el selector "Archivo:" el grupo de Rango se estrechaba y
+       quedaba prácticamente inutilizable). */
+    flex-shrink: 0;
   }
+  .de-toolbar-group label { white-space: nowrap; }
+  /* El calendario de flatpickr se inserta en <body>. El modal del editor de
+     fechas tiene z-index 1000, así que el calendario debe ir por encima para
+     poder hacer clic en los días. */
+  .flatpickr-calendar { z-index: 2147483647 !important; }
   .de-toolbar-group label {
     font-size: 12px;
     color: var(--text2);
@@ -1474,6 +1559,13 @@
     padding: 7px 14px; border-radius: 8px; font-size: 12px; cursor: pointer;
   }
   .sop-footer .btn-ghost:hover { background: var(--surface3); }
+  /* "Duplicar EPI→HAU" — acción correctiva sobre las alertas de HAU: VERDE */
+  #btnSopRenameHau {
+    background: var(--success); color: #fff; border: 0;
+    padding: 7px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  #btnSopRenameHau:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 4px 12px rgba(15,138,95,.32); }
+  #btnSopRenameHau:disabled { opacity: .4; cursor: not-allowed; }
 
   .badge.badge-alert {
     display: inline-block; min-width: 18px; padding: 0 6px;
@@ -2225,6 +2317,178 @@
       transparent 58%);
   }
 
+
+  /* ============================================================
+     v3 · CONTRASTE MODO OSCURO + LOGO EN MODALES + ICONOS DE
+     EMPTY-STATE EN MARCA — Fundación Cardioinfantil
+     ============================================================ */
+
+  /* --- Encabezado de Editor de Fechas / Cargue masivo: identidad de marca --- */
+  .date-editor-header {
+    background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-navy-2) 100%) !important;
+    color: #fff !important;
+  }
+  .date-editor-header .de-brand {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .date-editor-header .de-brand-logo {
+    display: block; height: 38px; width: auto; flex-shrink: 0;
+  }
+  .date-editor-header .de-brand-text {
+    padding-left: 14px;
+    border-left: 1px solid rgba(255,255,255,.25);
+  }
+  .date-editor-header .de-brand-title {
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 500;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
+  }
+  .date-editor-header p {
+    color: rgba(255,255,255,.78);
+    font-size: 12.5px;
+    margin: 0;
+  }
+  .date-editor-header p code,
+  .date-editor-header p b { color: #fff; }
+
+  /* --- Empty-state ICON = corazón LaCardio (sin bordes) --- */
+  .brand-empty-icon {
+    width: 64px; height: 64px;
+    margin: 0 auto 14px;
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFEAAABCCAYAAAAvzToDAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAVISURBVHhe7ZttaJVVHMB/e3Ert9QxSOZbC1ETWQkNjaUTYX5ZtOSCQmDSm+GIBDGM0TCSJJo2IbOtDTMcUTMnYyAUm5S4PsxqQUxyQSpjuba6bbtuXe+u96kP51x2O2w+b+fe3Xt5fvAw7vmfu8P53XPOc855zpMRDAb/xcMVmWqCh308iRrwJGrAk6gBT6IGMuJ2d/5tCMYC058XLYCVRbE53OMPwM2h6c85ObB6GeTOi80Vd/RJHB6FjkvQ0Q1dPwBTSkM3xOeKJ6BqE1RtgcUFMXELjE/Adz9D+zfQchkYBbJiyjGACBSthpe2QtVWKHlY+Sf6cS9xeBTe+xQavgJCwH1KxWKRleQOkA3VT8Ebz5vLDIWhqQ1qzkLkT2C++P6MZSDLCYlyytbD23tg02NqJm24k9jcDvveB3LlNVulZiJa0RB8cAD2bFczCH7shy01EPkbyLNZBkAYCICvAj46CAvz1QyucSYxFIbX6qDlAlDgoGKxGKKSFRvh3Lv/H88az8P+YxrKAAiKH/rKh9q7uDOJT78ux70H1IgL/oHSVdB1Qog81AhHz2gSGCUs/lxp0CrSvsRXjkBLp2aBUYLgK4PN62ULLFQzaMAAJqHvc22zBXsSm9thX12cKhclLK/5akAjYVi7BHo/UQOOsN5P/AEp0ORO6pp5cRaIKOOX63DiCzXgCOsSj5ySlbP+leQmDw62iMbhEmtGhkflPDBXjaQwmWJs/LJLDdjGmsSOS3JOZy176pAH77SqibaxZuXbXrkSSTcywX9TrPNdYC4xFIbzPXIpl47cD/031ERbmEvsuw7ctpQ1NcmGn66pibYwN/PrDSBHTU0jsqB/UE20hbnE34fkjonHbJhLvDWWxuOhHswlpj0RWLNMTbSFJ5G7sK5YTbSFucQli+RudLoShJK1aqItzCUuLRK/VlpiQGGx6y0xc4nLi9K4JU7CW8+qibYxl1iyMk0lGmJjeWeFGrCNucSF+VD66PTWetoQgOMvaHlwZS4RYPvmNJM4BaXrYK9PDTjCmsTKJ2WXNtRICiLr8NlhNeAYaxLXFkPpI2kwNhrAOHTWwYoH1aBjrEkEqNkNTKipKYQhjp101Gs/DWFdYmUZFC5N0S4tW2DbMdi2QQ26xrpEgNMH5CGiVMIQq5KOetEQ4oA9ids2iDMtTKmRJEUK7G6ISwuMYu/hPfLJX/EOBweYEo086dD9MTy+Rg1qxb6FxQXQdjjJu3VYVK3/bNwF4kgi8iZT+zIwpkaSgLA44dDXpHUacy+cSQR480Wo9smHWMmCIXbh+5pc78zYwblEgPr94CtPEpHynGPvyYQKxLVE5PKp+hk5Rs7lHDIIda+K1VWCsX93ng2tp1rtYoiN4z/atOzK2EVfbff6oLMBCvPl0d5EcheeK58TgWiVCGJNevUU7CgHRhLYvSPwUGLHwVj0SkRu4p45BG3HIStXTHgTJnNu0C8xSmUZ+Fuhdpfs3vHs4lkwNKImJgx9N5Z7MTwKJ1vh6GkgXx7T0/n7yTXyYDsULlCDcScxEqP4A9B4Dhq+Bv8tC29G2WEKfBu17lhbJbESo4TCcPF7+Y7eRblUc/JWlsptqN0tVlMJZG4kxhIV2tUDTZfl62cReZwvG8iIOVBlRfAY7KqE5ho1EDfmXqLKwAgMDEFPH1wbgIFBuPoX+CfknX4qRqp6Wi0irwIIXlBi8SP5JM7E+ATckY9sQ2EhGSAwCeMxr1Asl3PFVSvM31zVSGpITHKsDDIeJngSNeBJ1IAnUQOeRA14EjXgSdSAJ1EDnkQNeBI18B+jf44h0waQQQAAAABJRU5ErkJggg==");
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    font-size: 0 !important;
+    line-height: 0;
+    opacity: 1;
+    filter: drop-shadow(0 6px 14px rgba(228, 0, 70, 0.25));
+  }
+  [data-theme="dark"] .brand-empty-icon {
+    filter: drop-shadow(0 6px 14px rgba(228, 0, 70, 0.45));
+  }
+  .sop-empty .icon.brand-empty-icon,
+  .de-empty-state .icon.brand-empty-icon { display: block; }
+
+  /* ============================================================
+     MODO OSCURO — correcciones de contraste
+     El sistema usa var(--brand-navy) (#002D72) que en .dark queda
+     invisible sobre el fondo navy #0B1426. Sobreescribimos cada
+     uso de texto/borde en navy para que sea legible.
+     ============================================================ */
+
+  /* Empty state principal · "Bienvenido al Editor RIPS" */
+  [data-theme="dark"] .empty-state h2 {
+    color: #FFFFFF !important;
+  }
+  [data-theme="dark"] .empty-state p { color: var(--text2); }
+  [data-theme="dark"] .empty-state .kbd-hint { color: var(--text3); }
+
+  /* Empty-state icon-wrap · fondo blanco en oscuro para mostrar la marca */
+  [data-theme="dark"] .empty-state .icon-wrap {
+    background: #FFFFFF !important;
+    border: 1px solid rgba(167, 188, 214, 0.35) !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35), 0 0 0 4px rgba(228, 0, 70, 0.10);
+  }
+  [data-theme="dark"] .empty-state .icon-wrap svg { color: var(--brand-red); }
+
+  /* Summary cards · valores en navy invisibles en oscuro */
+  [data-theme="dark"] .summary-card.is-files .value { color: #6FA8FF !important; }
+  [data-theme="dark"] .summary-card.is-files       { border-top-color: #4E8BFF; }
+  /* Las tarjetas con inline style="color:var(--brand-navy)" (Rango de fechas) */
+  [data-theme="dark"] .summary-card .value[style*="brand-navy"],
+  [data-theme="dark"] .summary-card .value[style*="--brand-navy"] {
+    color: #6FA8FF !important;
+  }
+
+  /* Stats bar · "1003 de 1003 · 0 modif." */
+  [data-theme="dark"] .stats-bar { color: var(--text2); }
+  [data-theme="dark"] .stats-bar b { color: #6FA8FF !important; }
+
+  /* Botones outline (Seleccionar vista / Limpiar selección) */
+  [data-theme="dark"] .btn-outline {
+    color: var(--text) !important;
+    border-color: var(--border-strong) !important;
+    background: var(--surface);
+  }
+  [data-theme="dark"] .btn-outline:hover {
+    color: #6FA8FF !important;
+    border-color: #6FA8FF !important;
+    background: var(--surface2);
+  }
+
+  /* Drop zone icon · circulo blanco siempre */
+  [data-theme="dark"] .drop-zone-icon {
+    background: var(--surface2);
+    color: #6FA8FF !important;
+    border: 1px solid var(--border-strong);
+  }
+
+  /* Headers de tabla · texto navy → cielo claro */
+  [data-theme="dark"] thead th,
+  [data-theme="dark"] .de-table thead th,
+  [data-theme="dark"] table.sop-table thead th {
+    background: var(--surface3);
+    color: #B8CDF8 !important;
+    border-bottom-color: var(--border);
+  }
+
+  /* Tipo-pill consultas / procedimientos → mejor contraste */
+  [data-theme="dark"] .tipo-consultas {
+    color: #93B4FF !important;
+    background: rgba(78,139,255,.12);
+    border-color: rgba(78,139,255,.30);
+  }
+  [data-theme="dark"] .tipo-procedimientos {
+    color: #B8CDF8 !important;
+    background: rgba(78,139,255,.08);
+    border-color: rgba(78,139,255,.22);
+  }
+
+  /* Inputs / selects · borde focus navy invisible */
+  [data-theme="dark"] input[type="text"]:focus,
+  [data-theme="dark"] input[type="date"]:focus,
+  [data-theme="dark"] select:focus {
+    border-color: #6FA8FF !important;
+    box-shadow: 0 0 0 3px rgba(78, 139, 255, .15) !important;
+  }
+
+  /* Auth-input borde */
+  [data-theme="dark"] .auth-input { border-color: #4E6E9C; }
+  [data-theme="dark"] .auth-display.original { color: #FF8FA3; }
+  [data-theme="dark"] .summary-card.is-null .value { color: #FF6B8E !important; }
+
+  /* Badge-null · rgba navy invisible */
+  [data-theme="dark"] .badge-null {
+    background: rgba(78, 139, 255, .12);
+    color: #93B4FF !important;
+  }
+
+  /* Edit-btn hover en navy */
+  [data-theme="dark"] .edit-btn:hover {
+    border-color: #6FA8FF !important;
+    color: #6FA8FF !important;
+    background: rgba(78,139,255,.08);
+  }
+
+  /* Confirm-overlay & shortcuts → asegurar lectura */
+  [data-theme="dark"] .shortcuts-popover { background: var(--surface); color: var(--text); }
+
+  /* Drop-zone hover → navy a azul claro */
+  [data-theme="dark"] .drop-zone:hover,
+  [data-theme="dark"] .drop-zone.drag-over {
+    border-color: var(--brand-red);
+    background: rgba(228, 0, 70, .08);
+  }
+
+  /* Scrollbar */
+  [data-theme="dark"] .table-wrap,
+  [data-theme="dark"] .date-editor-body,
+  [data-theme="dark"] .date-editor-modal { scrollbar-color: #4E6E9C var(--surface); }
+
 </style>
 </head>
 <body>
@@ -2239,6 +2503,18 @@
     <p>Corrección masiva e individual de <code>numAutorizacion</code> y fechas en archivos RIPS JSON</p>
   </div>
   <div class="header-right">
+    <button class="btn btn-sm" id="btnOtrosAjustes" disabled title="Otros ajustes: (1) nomTecnologiaSalud=null cuando tipoOS≠01 en otrosServicios; (2) limita la estancia de urgencias a 48h ajustando fechaEgreso; (3) consultas con codConsulta 8904* → grupoServicios=03; (4) codDiagnosticoRelacionado(1|2|3)=null cuando duplica a codDiagnosticoPrincipal; (5) numAutorizacion=null en otrosServicios cuando tipoOS=01 o codTecnologiaSalud ∈ {2DS002, 2DS003, 5DS002-5DS004, 7DS001-7DS006}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Otros ajustes
+    </button>
+    <button class="btn btn-sm" id="btnAjusteNota" disabled title="NA: solo en archivos MODIFICADOS, fija numNota = &quot;NA-1&quot; (cuando es null) y fija tipoNota = &quot;NA&quot;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      NA
+    </button>
+    <button class="btn btn-sm" id="btnAjusteNotaUndo" disabled title="(-) NA: revierte el ajuste del botón NA — deja numNota y tipoNota en null en los archivos donde valgan &quot;NA-1&quot; y &quot;NA&quot;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="16" x2="14" y2="16"/></svg>
+      (-) NA
+    </button>
     <button class="btn btn-sm" id="btnFillNullsMode" disabled title="Reemplaza los null de cada archivo por su autorización más frecuente">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       Autocompletar nulls
@@ -2247,9 +2523,13 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.4 1 1 1 1.7v.6h6v-.6c0-.7.4-1.3 1-1.7A7 7 0 0 0 12 2z"/></svg>
       Cargue masivo
     </button>
-    <button class="btn btn-sm" id="btnExportNullsCsv" disabled title="Exporta un CSV con alertas: autorizaciones null, códigos TAP en otros servicios, urgencias >48h, longitud inválida de autorización, numDocumentoIdentificacion del profesional con formato inválido y soporte HAU">
+    <button class="btn btn-sm" id="btnExportNullsCsv" disabled title="Exporta un CSV con alertas: códigos TAP en otros servicios, urgencias >48h, longitud inválida de autorización y numDocumentoIdentificacion del profesional con formato inválido">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Alertas <span id="alertCountBadge" class="badge badge-alert" style="display:none;margin-left:4px"></span>
+    </button>
+    <button class="btn btn-sm" id="btnOpenCorrectorOCR" disabled title="Abrir el Corrector RIPS con OCR enlazando los archivos ya cargados aquí">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      Corrector OCR
     </button>
     <button class="btn btn-sm" id="btnOpenDateEditor" title="Abrir editor de fechas (D)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -2259,7 +2539,11 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
       Verificar soportes <span id="soportesAlertBadge" class="badge badge-alert" style="display:none;margin-left:4px"></span>
     </button>
-    <button class="btn btn-primary btn-sm" id="btnExportAll" disabled title="Descarga todos los archivos en un único 7z (Ctrl+Shift+D)">
+    <select id="selArchiveFormat" class="btn btn-sm" title="Formato del archivo comprimido de salida" style="padding:6px 8px;cursor:pointer">
+      <option value="7z" selected>7z</option>
+      <option value="zip">ZIP</option>
+    </select>
+    <button class="btn btn-primary btn-sm" id="btnExportAll" disabled title="Descarga todos los archivos en un único comprimido, nombrados por numFactura (Ctrl+Shift+D)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Descargar todos (7z)
     </button>
@@ -2276,11 +2560,13 @@
 <div id="dateEditorOverlay" class="date-editor-overlay" aria-hidden="true">
   <div class="date-editor-modal" role="dialog" aria-labelledby="dateEditorTitle">
     <div class="date-editor-header">
-      <div>
-        <h2 id="dateEditorTitle">🗓 Editor de Fechas</h2>
-        <p>Modifica únicamente la fecha (YYYY-MM-DD). La hora original del JSON se preserva automáticamente al exportar.</p>
+      <div class="de-brand">
+        <img src="data:image/png;base64,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" alt="LaCardio" class="de-brand-logo">
+        <div class="de-brand-text">
+          <h2 id="dateEditorTitle" class="de-brand-title">Editor de fechas</h2>
+        </div>
       </div>
-      <button class="btn btn-sm" id="btnCloseDateEditor" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">✕ Cerrar</button>
+      <button class="btn btn-sm" id="btnCloseDateEditor" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)">✕ Cerrar</button>
     </div>
 
     <div class="date-editor-toolbar">
@@ -2337,7 +2623,7 @@
         <tbody id="deTableBody"></tbody>
       </table>
       <div id="deEmptyState" class="de-empty-state" style="display:none">
-        <div class="icon">📭</div>
+        <div class="icon brand-empty-icon"></div>
         <p>No hay filas que coincidan con los filtros actuales.</p>
       </div>
     </div>
@@ -2358,11 +2644,13 @@
 <div id="bulkAuthOverlay" class="date-editor-overlay" aria-hidden="true">
   <div class="date-editor-modal" role="dialog" aria-labelledby="bulkAuthTitle">
     <div class="date-editor-header">
-      <div>
-        <h2 id="bulkAuthTitle">💡 Cargue masivo de autorizaciones</h2>
-        <p>Reemplaza <code>numAutorizacion</code> en bloque a partir de un CSV. Columnas: <b>numAutorizacion</b>; <b>numFactura</b>; <b>codigoServicio</b>; <b>fecha</b> <i>(opcional)</i>. Separador <code>;</code> · Fechas: se aceptan <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>. Si la fecha se omite, se aplica a <b>todos</b> los nodos con ese código en la factura.</p>
+      <div class="de-brand">
+        <img src="data:image/png;base64,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" alt="LaCardio" class="de-brand-logo">
+        <div class="de-brand-text">
+          <h2 id="bulkAuthTitle" class="de-brand-title">Cargue masivo de autorizaciones</h2>
+        </div>
       </div>
-      <button class="btn btn-sm" id="btnCloseBulkAuth" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)">✕ Cerrar</button>
+      <button class="btn btn-sm" id="btnCloseBulkAuth" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)">✕ Cerrar</button>
     </div>
 
     <div class="date-editor-toolbar">
@@ -2414,13 +2702,13 @@
         <tbody id="bulkAuthTableBody"></tbody>
       </table>
       <div id="bulkAuthEmpty" class="de-empty-state" style="display:block;padding:32px 24px">
-        <div class="icon">💡</div>
+        <div class="icon brand-empty-icon"></div>
         <p class="ba-help">
           1. Descarga la plantilla CSV: incluye una fila por cada registro con autorización del JSON cargado.<br>
           2. Edita la columna <code>numAutorizacion</code> con los valores nuevos.<br>
           3. Carga el CSV editado y revisa el resumen y los registros marcados.<br>
           4. Haz clic en <b>Ajustar</b> para reemplazar el <code>numAutorizacion</code> en cada JSON.<br>
-          <span style="color:var(--text3)">La columna <code>fecha</code> es <b>opcional</b>: si está vacía, el cambio se aplica a todos los nodos con ese <code>codigoServicio</code> en la factura indicada (se muestra una fila por cada match para que puedas auditarlo).<br>
+          <span style="color:var(--text3)">Las 6 columnas son <b>obligatorias</b>. <code>nodo</code> + <code>consecutivo</code> identifican el registro de forma única (resuelven el caso de varios numAutorizacion para el mismo código y fecha).<br>
           Las filas con factura no presente en los JSON cargados (huérfanos) y las sin coincidencia se omiten automáticamente.</span>
         </p>
       </div>
@@ -2442,6 +2730,18 @@
     <div class="sidebar-header">
       <span>Archivos cargados</span>
       <span class="count" id="sidebarCount">0</span>
+    </div>
+    <div class="file-select-toolbar" id="fileSelectToolbar" style="display:none">
+      <div class="fst-actions">
+        <button type="button" class="fst-btn is-all" id="btnSelectAllFiles" title="Marcar todos los archivos para 'Descargar todos (7z)'">
+          <span class="fst-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+          Seleccionar todos
+        </button>
+        <button type="button" class="fst-btn is-mod" id="btnSelectModFiles" title="Marcar solo los archivos modificados para 'Descargar todos (7z)'">
+          <span class="fst-ic"><span class="fst-dot"></span></span>
+          Seleccionar modificados
+        </button>
+      </div>
     </div>
     <div class="file-list" id="fileList"></div>
 
@@ -2519,6 +2819,7 @@ const state = {
   activeFile: null,
   editingRow: null,   // { fileKey, tipo, idx }
   selectedRows: new Set(),
+  selectedFiles: new Set(), // claves de archivos marcados para "Descargar todos (7z)"
   filter: { tipo: 'all', search: '', fechaDesde: '', fechaHasta: '' }
 };
 
@@ -2610,6 +2911,212 @@ function normalizeMedicamentoCodes(data) {
   return changed;
 }
 
+// Ajuste automático al cargar: numAutorizacion = null en facturas con
+// hospitalización y/o urgencias.
+//
+// Aplica ÚNICAMENTE si el JSON tiene nodo "hospitalizacion" y/o "urgencias"
+// con al menos un ítem (en cualquier usuario); de lo contrario el archivo
+// NO se modifica. Cuando aplica, recorre TODOS los usuarios del RIPS y pone
+// numAutorizacion = null según el nodo:
+//   - medicamentos:    todos los ítems.
+//   - otrosServicios:  todos, SALVO los tipificados con tipoOS == "03".
+//                      EXCEPCIÓN a esa salvedad: si además codTecnologiaSalud
+//                      == "5DSA087", SÍ se pone a null. Es una regla
+//                      independiente que se suma.
+//                      CONDICIONAL: codTecnologiaSalud == "5DSA01" (derechos
+//                      de sala de observación) conserva su numAutorizacion
+//                      cualquiera sea su tipoOS, SALVO cuando el archivo tiene
+//                      nodo "urgencias" y NO tiene nodo "hospitalizacion": en
+//                      ese caso SÍ se pone a null.
+//   - consultas:       "890701" se exime SIEMPRE (conserva su autorización).
+//                      Las demás consultas cuyo codConsulta empiece por "8907"
+//                      (comodín 8907**: 890780, 890793, etc.) van a null.
+//                      SALVAGUARDA anti-todo-null: si tras aplicar el ajuste
+//                      NINGÚN ítem de servicio del RIPS conservara autorización,
+//                      se reaplica eximiendo TAMBIÉN a esas 8907** (además de
+//                      "890701", que ya estaba exenta), para garantizar que
+//                      quede al menos una autorización viva en los servicios.
+//   - procedimientos:  todos, SALVO los que tengan grupoServicios == "04".
+// Los nodos "hospitalizacion" y "urgencias" conservan su numAutorizacion.
+// Devuelve la cantidad de campos puestos a null.
+function nullAutorizacionesHospUrg(data) {
+  const usuarios = Array.isArray(data?.usuarios) ? data.usuarios : [];
+
+  // Alcance de ARCHIVO COMPLETO (todos los usuarios), igual que el resto de la
+  // función: se evalúa por separado si hay hospitalización y si hay urgencias.
+  const tieneHosp = usuarios.some(u => {
+    const s = u?.servicios;
+    return !!s && Array.isArray(s.hospitalizacion) && s.hospitalizacion.length > 0;
+  });
+  const tieneUrg = usuarios.some(u => {
+    const s = u?.servicios;
+    return !!s && Array.isArray(s.urgencias) && s.urgencias.length > 0;
+  });
+  if (!tieneHosp && !tieneUrg) return 0;
+
+  // La exención del código "5DSA01" deja de aplicar cuando el archivo tiene
+  // urgencias pero NO tiene hospitalización: en ese escenario su
+  // numAutorizacion SÍ debe quedar en null.
+  const urgSinHosp = tieneUrg && !tieneHosp;
+
+  // Aplica el nullificado sobre el propio `data`. El parámetro `eximeOtras8907`
+  // controla la salvaguarda: cuando es true, las consultas 8907** distintas de
+  // "890701" también se eximen (no se ponen a null). "890701" se exime siempre,
+  // con o sin salvaguarda.
+  const aplicar = (eximeOtras8907) => {
+    let changed = 0;
+    const nullify = item => {
+      if (item && 'numAutorizacion' in item && item.numAutorizacion !== null) {
+        item.numAutorizacion = null;
+        changed++;
+      }
+    };
+    usuarios.forEach(u => {
+      const s = u?.servicios;
+      if (!s) return;
+      (s.medicamentos || []).forEach(nullify);
+      (s.otrosServicios || []).forEach(item => {
+        // EXENCIÓN CONDICIONAL: codTecnologiaSalud == "5DSA01" (derechos de
+        // sala de observación) conserva su numAutorizacion sin importar el
+        // tipoOS, SALVO cuando el archivo tiene urgencias y NO tiene
+        // hospitalización: en ese caso SÍ se pone a null.
+        // El nullify es explícito a propósito: si solo se dejara caer el flujo,
+        // un 5DSA01 con tipoOS "03" quedaría eximido por la rama siguiente y
+        // no se anularía.
+        if (String(item?.codTecnologiaSalud ?? '') === '5DSA01') {
+          if (urgSinHosp) { nullify(item); return; }
+          return;
+        }
+        if (item && String(item.tipoOS) === '03') {
+          // tipoOS "03" se exime, PERO el caso 5DSA087 sí va a null.
+          if (String(item.codTecnologiaSalud ?? '') === '5DSA087') { nullify(item); return; }
+          return;
+        }
+        nullify(item);
+      });
+      (s.consultas || []).forEach(item => {
+        const cod = String(item.codConsulta ?? '');
+        // "890701" se exime SIEMPRE (excepción permanente: conserva su auth).
+        if (cod === '890701') return;
+        if (cod.startsWith('8907')) {
+          // Las demás 8907** (890780, 890793, etc.) van a null en modo base.
+          // Solo se eximen cuando la salvaguarda lo exige (todo el resto de
+          // servicios quedaría sin autorización).
+          if (eximeOtras8907) return;
+          nullify(item);
+          return;
+        }
+        nullify(item);
+      });
+      (s.procedimientos || []).forEach(item => {
+        if (item && String(item.grupoServicios) === '04') return;
+        nullify(item);
+      });
+    });
+    return changed;
+  };
+
+  // Cuenta cuántos ítems conservan numAutorizacion no nula, mirando SOLO los
+  // nodos de servicio que este ajuste modifica (consultas, procedimientos,
+  // medicamentos, otrosServicios). Los nodos "hospitalizacion" y "urgencias"
+  // se excluyen a propósito: la autorización que conserva hospitalización NO
+  // cuenta como "autorización viva" para efectos de la salvaguarda, porque el
+  // objetivo es que quede autorización en los servicios facturables, no en la
+  // estancia. Así, un RIPS que solo tuviera 890701 en servicios (aunque tenga
+  // hospitalización) igual dispara la salvaguarda y exime 890701.
+  const contarConAuth = () => {
+    let n = 0;
+    const NODOS = ['consultas', 'procedimientos', 'medicamentos', 'otrosServicios'];
+    usuarios.forEach(u => {
+      const s = u?.servicios || {};
+      NODOS.forEach(k => {
+        (Array.isArray(s[k]) ? s[k] : []).forEach(i => {
+          if (i && i.numAutorizacion !== null && i.numAutorizacion !== undefined && i.numAutorizacion !== '') n++;
+        });
+      });
+    });
+    return n;
+  };
+
+  // Intento base: "890701" se exime, las demás 8907** van a null. Antes de
+  // tocar nada, se toma una instantánea de las autorizaciones originales por si
+  // hay que revertir.
+  const snap = snapshotAutorizaciones(data);
+  let changed = aplicar(false);
+
+  // Salvaguarda: si el ajuste dejó los servicios del RIPS sin ninguna
+  // autorización, se restaura el estado original y se reaplica eximiendo también
+  // las 8907** distintas de "890701".
+  if (contarConAuth() === 0) {
+    restaurarAutorizaciones(data, snap);
+    changed = aplicar(true);
+  }
+
+  return changed;
+}
+
+// Toma una instantánea { path -> numAutorizacion } de todas las autorizaciones
+// del RIPS, para poder revertir si la salvaguarda lo necesita.
+function snapshotAutorizaciones(data) {
+  const snap = [];
+  const NODOS = ['consultas', 'procedimientos', 'medicamentos', 'otrosServicios', 'hospitalizacion', 'urgencias'];
+  (Array.isArray(data?.usuarios) ? data.usuarios : []).forEach((u, ui) => {
+    const s = u?.servicios || {};
+    NODOS.forEach(nodo => {
+      (Array.isArray(s[nodo]) ? s[nodo] : []).forEach((item, idx) => {
+        if (item && 'numAutorizacion' in item) {
+          snap.push({ ui, nodo, idx, val: item.numAutorizacion });
+        }
+      });
+    });
+  });
+  return snap;
+}
+
+// Restaura las autorizaciones capturadas por snapshotAutorizaciones.
+function restaurarAutorizaciones(data, snap) {
+  if (!Array.isArray(snap)) return;
+  const usuarios = Array.isArray(data?.usuarios) ? data.usuarios : [];
+  snap.forEach(({ ui, nodo, idx, val }) => {
+    const item = usuarios[ui]?.servicios?.[nodo]?.[idx];
+    if (item && 'numAutorizacion' in item) item.numAutorizacion = val;
+  });
+}
+
+// Limpia numDocumentoIdentificacion del PROFESIONAL en nodos de servicio
+// (NO toca el nodo "usuarios" / paciente). Corrige los dos casos que disparaban
+// la alerta "documento de profesional inválido" pero cuyo documento real SÍ es
+// válido:
+//   • caracteres invisibles pegados (espacios, \r, \n, tab, NBSP, zero-width)
+//   • sufijo tras un guion  →  conserva la parte antes del primer "-"
+//     (verificado: esa parte es la cédula real del profesional)
+// Solo reescribe si el resultado queda como cadena de SOLO dígitos; si no,
+// lo deja igual para que la alerta lo siga marcando (revisión manual).
+function normalizeProfesionalDocs(data) {
+  const NODOS = ['consultas','procedimientos','medicamentos','otrosServicios','hospitalizacion','urgencias'];
+  const reDig = /^\d+$/;
+  let changed = 0;
+  const usuarios = Array.isArray(data?.usuarios) ? data.usuarios : [];
+  usuarios.forEach(u => {
+    const s = u?.servicios;
+    if (!s) return;
+    NODOS.forEach(nodo => {
+      (Array.isArray(s[nodo]) ? s[nodo] : []).forEach(item => {
+        const doc = item?.numDocumentoIdentificacion;
+        if (typeof doc !== 'string' || doc === '') return;
+        let v = doc.replace(/[\s\u200B-\u200D\uFEFF]/g, ''); // quita espacios/tabs/saltos/NBSP/zero-width
+        const dash = v.indexOf('-');
+        if (dash !== -1) v = v.slice(0, dash);                     // conserva parte antes del guion
+        if (v !== doc && reDig.test(v)) {
+          item.numDocumentoIdentificacion = v;
+          changed++;
+        }
+      });
+    });
+  });
+  return changed;
+}
+
 function buildRows(data) {
   const rows = [];
   const servicios = data?.usuarios?.[0]?.servicios || {};
@@ -2643,30 +3150,65 @@ function getFilename(key) {
   return state.files[key]?.name || key;
 }
 
-// Carga de archivos
-function loadFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
+// Carga de archivos (POR LOTES).
+//
+// Lee y parsea TODOS los archivos del lote y hace UN SOLO re-render al final.
+// Antes se cargaba de a uno y cada archivo re-renderizaba toda la UI
+// (renderSidebar + renderMain + nueva instancia de Flatpickr): con cientos de
+// RIPS eso era O(N²), disparaba cientos de repintados en ráfaga y congelaba /
+// tumbaba el navegador. Ahora el costo de render es constante por lote.
+async function loadFiles(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+
+  let ok = 0, fail = 0, medTotal = 0, authNullTotal = 0, docTotal = 0;
+  const errores = [];
+
+  // Lee y parsea todos los archivos en paralelo. file.text() ya trae el
+  // contenido en memoria, así que no saturamos el hilo con callbacks.
+  await Promise.all(files.map(async file => {
     try {
-      const raw = JSON.parse(e.target.result);
+      const text = await file.text();
+      const raw = JSON.parse(text);
       const key = file.name;
       const medNorm = normalizeMedicamentoCodes(raw);
+      const authNull = nullAutorizacionesHospUrg(raw);
+      const docNorm = normalizeProfesionalDocs(raw);
       const rows = buildRows(raw);
-      state.files[key] = { raw, rows, modified: medNorm > 0, name: file.name };
+      state.files[key] = { raw, rows, modified: medNorm > 0 || authNull > 0 || docNorm > 0, name: file.name };
+      // Por defecto, cada archivo nuevo queda marcado para "Descargar todos (7z)".
+      state.selectedFiles.add(key);
       if (!state.activeFile) state.activeFile = key;
-      renderSidebar();
-      renderMain();
-      if (medNorm > 0) {
-        toast(`✓ ${file.name} cargado: ${rows.length} registros · ${medNorm} código(s) de medicamento normalizados`);
-      } else {
-        toast(`✓ ${file.name} cargado: ${rows.length} registros con autorización`);
-      }
-    } catch(err) {
-      toast(`Error al parsear ${file.name}: ${err.message}`, 'error');
+      ok++;
+      medTotal += medNorm;
+      authNullTotal += authNull;
+      docTotal += docNorm;
+    } catch (err) {
+      fail++;
+      errores.push(`${file.name}: ${err.message}`);
     }
-  };
-  reader.readAsText(file);
+  }));
+
+  // UN único re-render tras procesar el lote completo.
+  renderSidebar();
+  renderMain();
+
+  const ajustes = [];
+  if (medTotal > 0)      ajustes.push(`${medTotal} código(s) de medicamento normalizados`);
+  if (authNullTotal > 0) ajustes.push(`${authNullTotal} numAutorizacion → null (hosp/urg)`);
+  if (docTotal > 0)      ajustes.push(`${docTotal} doc(s) de profesional corregidos`);
+  if (ok) {
+    const extra = ajustes.length ? ` · ${ajustes.join(' · ')}` : '';
+    toast(`✓ ${ok} archivo(s) cargado(s)${extra}`);
+  }
+  if (fail) {
+    toast(`⚠ ${fail} archivo(s) con error al parsear (ver consola)`, 'error');
+    console.error('Errores de carga RIPS:\n' + errores.join('\n'));
+  }
 }
+
+// Compatibilidad: carga de un único archivo (delega en el cargador por lotes).
+function loadFile(file) { return loadFiles([file]); }
 
 // Sidebar
 function renderSidebar() {
@@ -2674,22 +3216,43 @@ function renderSidebar() {
   list.innerHTML = '';
   const keys = Object.keys(state.files);
 
+  // Limpiar de selectedFiles cualquier clave que ya no exista.
+  state.selectedFiles.forEach(k => { if (!state.files[k]) state.selectedFiles.delete(k); });
+
+  const toolbar = document.getElementById('fileSelectToolbar');
+
   if (keys.length === 0) {
     list.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text3);text-align:center">Sin archivos</div>';
+    if (toolbar) toolbar.style.display = 'none';
+    syncFileSelectionUI();
     return;
   }
+
+  if (toolbar) toolbar.style.display = 'flex';
 
   keys.forEach(key => {
     const f = state.files[key];
     const item = document.createElement('div');
     item.className = 'file-item' + (state.activeFile === key ? ' active' : '');
     item.innerHTML = `
-      <div class="file-item-name">${f.name}</div>
+      <div class="file-item-top">
+        <input type="checkbox" class="file-item-check" aria-label="Incluir ${f.name} en la descarga" ${state.selectedFiles.has(key) ? 'checked' : ''}>
+        <div class="file-item-name">${f.name}</div>
+      </div>
       <div class="file-item-meta">
         <span>${f.rows.length} reg.</span>
         ${f.modified ? '<span class="badge badge-modified">● Modificado</span>' : '<span class="badge">Sin cambios</span>'}
       </div>
     `;
+    // La casilla controla la inclusión en "Descargar todos (7z)" sin
+    // cambiar el archivo activo.
+    const chk = item.querySelector('.file-item-check');
+    chk.addEventListener('click', e => e.stopPropagation());
+    chk.addEventListener('change', () => {
+      if (chk.checked) state.selectedFiles.add(key);
+      else state.selectedFiles.delete(key);
+      syncFileSelectionUI();
+    });
     item.addEventListener('click', () => {
       state.activeFile = key;
       state.editingRow = null;
@@ -2701,12 +3264,38 @@ function renderSidebar() {
   });
 
   // Habilitar botones si hay archivos cargados
-  const hasFiles = !!Object.keys(state.files).length;
-  document.getElementById('btnExportAll').disabled = !hasFiles;
+  const hasFiles = !!keys.length;
   document.getElementById('btnExportNullsCsv').disabled = !hasFiles;
   document.getElementById('btnFillNullsMode').disabled = !hasFiles;
+  const oaBtn = document.getElementById('btnOtrosAjustes');
+  if (oaBtn) oaBtn.disabled = !hasFiles;
+  const naBtn = document.getElementById('btnAjusteNota');
+  // "NA" solo aplica a archivos modificados: se habilita si existe al menos uno.
+  if (naBtn) naBtn.disabled = !keys.some(k => state.files[k].modified);
+  const naUndoBtn = document.getElementById('btnAjusteNotaUndo');
+  // "(-) NA" se habilita si hay al menos un archivo con la marca que puso "NA"
+  // (numNota === "NA-1" o tipoNota === "NA"), es decir, algo que revertir.
+  if (naUndoBtn) naUndoBtn.disabled = !keys.some(k => {
+    const raw = state.files[k] && state.files[k].raw;
+    return !!raw && (raw.numNota === 'NA-1' || raw.tipoNota === 'NA');
+  });
   const baBtn = document.getElementById('btnBulkAuthCsv');
   if (baBtn) baBtn.disabled = !hasFiles;
+  const ocrBtn = document.getElementById('btnOpenCorrectorOCR');
+  if (ocrBtn) ocrBtn.disabled = !hasFiles;
+
+  syncFileSelectionUI();
+}
+
+// Refresca el contador de la barra de selección y el estado del botón
+// "Descargar todos (7z)" según cuántos archivos estén marcados.
+function syncFileSelectionUI() {
+  const total = Object.keys(state.files).length;
+  const sel = state.selectedFiles.size;
+  const info = document.getElementById('fileSelectInfo');
+  if (info) info.textContent = `${sel} / ${total} marcados`;
+  const exportBtn = document.getElementById('btnExportAll');
+  if (exportBtn) exportBtn.disabled = sel === 0;
 }
 
 // Tabla principal
@@ -2731,6 +3320,26 @@ function getFilteredRows() {
   if (fechaHasta) rows = rows.filter(r => r.fecha && r.fecha !== '-' && r.fecha <= fechaHasta);
   return rows;
 }
+
+function createEmptyState() {
+  const div = document.createElement('div');
+  div.className = 'empty-state';
+  div.id = 'emptyState';
+  div.innerHTML = `
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-9.6-9.4C1 8 3.1 4 7 4c2.1 0 3.7 1.1 5 3 1.3-1.9 2.9-3 5-3 3.9 0 6 4 4.6 7.6C19.5 16.4 12 21 12 21z"/></svg>
+      </div>
+      <h2>Bienvenido al Editor RIPS</h2>
+      <p>Carga uno o más archivos JSON desde el panel izquierdo para empezar a corregir números de autorización, fechas y exportar alertas de validación.</p>
+      <div class="kbd-hint">
+        <span>Atajo:</span> <kbd>?</kbd> <span>muestra todos los atajos disponibles</span>
+      </div>`;
+  return div;
+}
+
+// Instancia activa de Flatpickr. Se guarda para destruirla antes de re-crear
+// el calendario en cada renderMain y evitar acumular widgets huérfanos.
+let _rangePicker = null;
 
 function renderMain() {
   const main = document.getElementById('mainArea');
@@ -2839,6 +3448,7 @@ function renderMain() {
       <input type="text" id="bulkInput" placeholder="Nuevo número..." />
       <button class="btn btn-primary btn-sm" id="btnBulkApply">Aplicar a selección</button>
       <button class="btn btn-outline btn-sm" id="btnBulkReset">Revertir selección</button>
+      <button class="btn btn-outline btn-sm" id="btnBulkClear" title="Deja en null el campo numAutorizacion de todas las filas seleccionadas">∅ Vaciar seleccionadas</button>
     </div>
 
     <div class="table-wrap">
@@ -2865,8 +3475,10 @@ function renderMain() {
   // Restaurar filtro
   document.getElementById('filterTipo').value = filterTipo;
 
-  // Inicializar Flatpickr
-  flatpickr("#rangoFecha", {
+  // Inicializar Flatpickr (destruye la instancia previa para no acumular
+  // calendarios huérfanos al re-renderizar).
+  if (_rangePicker) { try { _rangePicker.destroy(); } catch (_) {} }
+  _rangePicker = flatpickr("#rangoFecha", {
     mode: "range",
     dateFormat: "Y-m-d",
     altInput: true,
@@ -2874,13 +3486,22 @@ function renderMain() {
     allowInput: false,
     locale: "es",
     defaultDate: [state.filter.fechaDesde || null, state.filter.fechaHasta || null].filter(Boolean),
+    // CAUSA DEL FALLO ANTERIOR: en modo "range" flatpickr dispara onChange ya en
+    // el PRIMER clic (con una sola fecha). Como renderMain() vuelve a construir
+    // la vista y en ese proceso hace _rangePicker.destroy() y crea uno nuevo, el
+    // calendario quedaba destruido a mitad de la selección: el que seguía
+    // visible en pantalla era un calendario "muerto" y el segundo clic no
+    // producía ningún efecto, de modo que el rango nunca podía completarse.
+    // Por eso ahora solo se repinta cuando la selección ya está resuelta.
     onChange: function(selectedDates) {
       if (selectedDates.length === 2) {
-        state.filter.fechaDesde = selectedDates[0].toISOString().split('T')[0];
-        state.filter.fechaHasta = selectedDates[1].toISOString().split('T')[0];
-      } else {
+        state.filter.fechaDesde = toLocalISODate(selectedDates[0]);
+        state.filter.fechaHasta = toLocalISODate(selectedDates[1]);
+      } else if (selectedDates.length === 0) {
         state.filter.fechaDesde = '';
         state.filter.fechaHasta = '';
+      } else {
+        return; // selección a medias: no tocar la vista todavía
       }
       state.selectedRows.clear();
       renderMain();
@@ -2945,6 +3566,7 @@ function renderMain() {
   });
   document.getElementById('btnBulkApply').addEventListener('click', bulkApply);
   document.getElementById('btnBulkReset').addEventListener('click', bulkReset);
+  document.getElementById('btnBulkClear').addEventListener('click', bulkClear);
 
   // Render de filas
   renderRows(rows, f);
@@ -3195,6 +3817,42 @@ function bulkReset() {
   toast(`↩ ${count} registros revertidos a valor original`);
 }
 
+// Vacía en bloque el campo numAutorizacion de todas las filas seleccionadas.
+// Pide confirmación (acción destructiva) y deja el valor como null literal (no
+// la cadena "null") para que JSON.stringify lo exporte sin comillas. Mantiene
+// row.original intacto, de modo que el badge "modificado" se muestra y
+// "Revertir selección" sigue funcionando.
+async function bulkClear() {
+  if (!state.selectedRows.size) { toast('No hay filas seleccionadas', 'warn'); return; }
+  const f = state.files[state.activeFile];
+  if (!f) return;
+  const n = state.selectedRows.size;
+  const ok = await confirmDialog({
+    title: 'Vaciar autorizaciones seleccionadas',
+    body: `El campo numAutorizacion quedará en null en ${n} registro${n !== 1 ? 's' : ''} seleccionado${n !== 1 ? 's' : ''}. Puedes revertirlos con el botón Revertir selección.`,
+    confirmText: 'Vaciar a null',
+    danger: true,
+  });
+  if (!ok) return;
+  let count = 0, already = 0;
+  state.selectedRows.forEach(key => {
+    const [tipo, idxStr] = key.split('__');
+    const idx = parseInt(idxStr);
+    const row = f.rows.find(r => r.tipo === tipo && r.idx === idx);
+    if (!row) return;
+    if (row.current === null) { already++; return; }
+    row.current = null;
+    syncRaw(f, tipo, idx, null);
+    count++;
+  });
+  f.modified = f.rows.some(r => r.current !== r.original);
+  state.selectedRows.clear();
+  renderSidebar();
+  renderMain();
+  const extra = already ? ` (${already} ya estaba${already !== 1 ? 'n' : ''} vacía${already !== 1 ? 's' : ''})` : '';
+  toast(`∅ ${count} autorizacion${count !== 1 ? 'es' : ''} vaciada${count !== 1 ? 's' : ''}${extra}`);
+}
+
 // Descarga
 function downloadFile(key) {
   const f = state.files[key];
@@ -3213,13 +3871,14 @@ function downloadFile(key) {
 // Genera un CSV de alertas recorriendo la totalidad de archivos JSON cargados.
 // Columnas: numFactura, nodo, consecutivo, observacion.
 //
-// Tipos de alertas:
-//   1. Autorización null  → observación: "Número de autorización null por favor revisar"
-//   2. codTecnologiaSalud == "601T01" o "601T02" en otrosServicios
+// Tipos de alertas (se conserva la numeración 2..5 por continuidad: las
+// antiguas alerta 1 —autorización null— y alerta 6 —soporte HAU— fueron
+// retiradas de este CSV):
+//   2. codTecnologiaSalud == "601T01" o "601T02" o "602T01" o "601T02"  en otrosServicios
 //      → observación: "revisar que contenga soporte TAP según lo descrito en la res 2284 de 2023"
 //   3. Nodo urgencias con diferencia > 48 horas entre fechaInicioAtencion y fechaEgreso
 //      → observación: "revisar nodo urgencias superior a las 48 horas"
-//   4. numAutorizacion con longitud inválida (excluye null, cubierto por la alerta 1):
+//   4. numAutorizacion con longitud inválida (los valores en null se omiten):
 //      - Regla fija: la longitud debe ser exactamente 9 caracteres (independiente de
 //        la existencia del nodo urgencias).
 //      → observación: "revisar numero de autorizacion contiene numero diferente a 9 caracteres"
@@ -3229,13 +3888,9 @@ function downloadFile(key) {
 //      caracteres especiales (guiones, puntos, espacios, etc.) o cualquier cosa distinta de
 //      dígitos 0-9. Se excluyen valores null/vacíos (no cumplen el criterio "contiene letras").
 //      → observación: "Revisar nodo con numero de identificacion incorrecto del profesional en salud"
-//   6. Soporte HAU a nivel de FACTURA (una sola fila por archivo). Se dispara SOLO cuando el
-//      JSON tiene el nodo "urgencias" con al menos un ítem, Y SIMULTÁNEAMENTE:
-//        - NO tiene el nodo "hospitalizacion" con ítems, y
-//        - NINGÚN ítem de "otrosServicios" contiene codTecnologiaSalud == "5DSA01".
-//      Si cualquiera de los dos supresores está presente, la alerta NO aparece.
-//      → observación: "Por favor garantizar que la factura cuente con el soporte HAU."
-//        (nodo="Urgencias", consecutivo = consecutivo del primer ítem de urgencias)
+// NOTA: la antigua "Alerta 6" (soporte HAU) fue RETIRADA de este CSV y del
+// contador de alertas. La verificación del soporte HAU vive ahora únicamente
+// en el botón "Verificar soportes" (módulo sop*, con su propia regla).
 function exportAlertsCsv() {
   const keys = Object.keys(state.files);
   if (!keys.length) {
@@ -3256,7 +3911,7 @@ function exportAlertsCsv() {
     urgencias: 'Urgencias',
   };
 
-  const TAP_CODES = new Set(['601T01', '601T02']);
+  const TAP_CODES = new Set(['601T01', '601T02','602T01','602T02']);
   const UMBRAL_URGENCIAS_MS = 48 * 60 * 60 * 1000; // 48 horas
 
   // Sanitiza un valor para una celda CSV: quita ; \r \n
@@ -3274,12 +3929,10 @@ function exportAlertsCsv() {
     return isNaN(dt.getTime()) ? null : dt;
   };
 
-  let countNulls = 0;
   let countTap = 0;
   let countUrg = 0;
   let countLen = 0;
   let countDoc = 0;
-  let countHau = 0;
 
   keys.forEach(key => {
     const f = state.files[key];
@@ -3291,26 +3944,13 @@ function exportAlertsCsv() {
       || f.raw.encabezado?.numFactura
       || '';
 
-    // --- Alerta 1: autorizaciones null (desde state.rows, ya calculado) ---
-    f.rows.forEach(row => {
-      if (row.current !== null) return;
-      lines.push([
-        cell(row.numFactura),
-        cell(labelNodo[row.tipo] || row.tipo),
-        cell(row.consecutivo),
-        cell('Número de autorización null por favor revisar'),
-      ].join(sep));
-      countNulls++;
-    });
-
     // Acceso al raw para las siguientes alertas
     const servicios = f.raw.usuarios?.[0]?.servicios || {};
-    const hasUrgencias = Array.isArray(servicios.urgencias) && servicios.urgencias.length > 0;
 
     // --- Alerta 4: numAutorizacion con longitud inválida ---
     // Regla fija: la longitud debe ser exactamente 9 caracteres, independientemente
     // de si el JSON tiene nodo urgencias o no. Cualquier longitud ≠ 9 dispara la alerta.
-    // Excluye null explícitamente (ya reportado por alerta 1).
+    // Excluye null/undefined explícitamente (la alerta de autorización null fue retirada).
     const obsLen = 'revisar numero de autorizacion contiene numero diferente a 9 caracteres';
     f.rows.forEach(row => {
       if (row.current === null || row.current === undefined) return;
@@ -3384,29 +4024,6 @@ function exportAlertsCsv() {
         countDoc++;
       });
     });
-
-    // --- Alerta 6: Soporte HAU (a nivel de FACTURA, una sola fila por archivo) ---
-    // Se dispara SOLO cuando el JSON tiene nodo urgencias con ítems Y NO tiene ningún
-    // supresor. Supresores (cualquiera de los dos la suprime):
-    //   A) Nodo "hospitalizacion" presente con al menos un ítem.
-    //   B) Al menos un ítem de "otrosServicios" con codTecnologiaSalud === "5DSA01".
-    // hasUrgencias ya está calculado arriba (línea de Alerta 4).
-    if (hasUrgencias) {
-      const hosp = Array.isArray(servicios.hospitalizacion) ? servicios.hospitalizacion : [];
-      const hasHospitalizacion = hosp.length > 0;
-      const tiene5DSA01 = otros.some(i => i?.codTecnologiaSalud === '5DSA01');
-      if (!hasHospitalizacion && !tiene5DSA01) {
-        // Una sola fila por archivo: consecutivo = consecutivo del primer ítem de urgencias
-        const primerUrg = urgencias[0] || {};
-        lines.push([
-          cell(primerUrg.numFactura || numFacturaGlobal),
-          cell(labelNodo.urgencias),
-          cell(primerUrg.consecutivo),
-          cell('Por favor garantizar que la factura cuente con el soporte HAU.'),
-        ].join(sep));
-        countHau++;
-      }
-    }
   });
 
   if (lines.length <= 1) {
@@ -3428,8 +4045,8 @@ function exportAlertsCsv() {
   a.click();
   URL.revokeObjectURL(url);
 
-  console.log(`Alertas exportadas: ${total} total  ·  nulls=${countNulls}  ·  TAP=${countTap}  ·  urgencias>48h=${countUrg}  ·  longitud_invalida=${countLen}  ·  doc_prof_invalido=${countDoc}  ·  hau=${countHau}`);
-  toast(`🚨 ${total} alerta${total !== 1 ? 's' : ''} exportada${total !== 1 ? 's' : ''}: ${countNulls} null · ${countTap} TAP · ${countUrg} urg>48h · ${countLen} len.inv · ${countDoc} doc.prof · ${countHau} hau`);
+  console.log(`Alertas exportadas: ${total} total  ·  TAP=${countTap}  ·  urgencias>48h=${countUrg}  ·  longitud_invalida=${countLen}  ·  doc_prof_invalido=${countDoc}`);
+  toast(`🚨 ${total} alerta${total !== 1 ? 's' : ''} exportada${total !== 1 ? 's' : ''}: ${countTap} TAP · ${countUrg} urg>48h · ${countLen} len.inv · ${countDoc} doc.prof`);
 }
 
 document.getElementById('btnExportNullsCsv').addEventListener('click', exportAlertsCsv);
@@ -3516,6 +4133,367 @@ function fillNullsWithMode() {
 
 document.getElementById('btnFillNullsMode').addEventListener('click', fillNullsWithMode);
 
+// "Otros ajustes" — aplica tres correcciones sobre el contenido crudo (f.raw) de
+// cada archivo cargado, recorriendo TODOS los usuarios del RIPS:
+//
+//   1) otrosServicios: cuando "tipoOS" tiene un valor distinto de "01",
+//      se fuerza "nomTecnologiaSalud" a null.
+//
+//   2) urgencias: cuando el tiempo transcurrido entre "fechaInicioAtencion" y
+//      "fechaEgreso" supera 48 horas, se ajusta "fechaEgreso" para que la
+//      estancia sea exactamente de 48 horas (inicio + 48h), conservando el
+//      formato original "YYYY-MM-DD HH:mm".
+//
+//   3) consultas: cuando "codConsulta" empieza por "8904" (comodín 8904*), se
+//      fuerza "grupoServicios" al valor "03".
+//
+// NOTA: el antiguo ajuste que reemplazaba "tipoOS" 05 → 04 en otrosServicios
+// fue RETIRADO. El campo "tipoOS" ya NO se modifica: solo se LEE (en el punto 1)
+// para decidir si "nomTecnologiaSalud" va a null.
+//
+// Las fechas usan el formato local "YYYY-MM-DD HH:mm" (o con segundos). Se
+// parsean como hora local para evitar desfases por zona horaria.
+function parseRipsDate(s) {
+  if (typeof s !== 'string') return null;
+  const m = s.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, se] = m;
+  const dt = new Date(+y, +mo - 1, +d, +h, +mi, se ? +se : 0);
+  return isNaN(dt.getTime()) ? null : { dt, hasSeconds: se != null };
+}
+
+function formatRipsDate(dt, hasSeconds) {
+  const p = n => String(n).padStart(2, '0');
+  const base = `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+  return hasSeconds ? `${base}:${p(dt.getSeconds())}` : base;
+}
+
+function applyOtrosAjustes() {
+  const keys = Object.keys(state.files);
+  if (!keys.length) {
+    toast('No hay archivos cargados', 'warn');
+    return;
+  }
+
+  const MS_48H = 48 * 60 * 60 * 1000;
+  let filesAffected = 0;
+  let totalNom = 0;   // nomTecnologiaSalud puestos a null
+  let totalUrg = 0;   // fechaEgreso ajustadas
+  let totalGrupo = 0; // grupoServicios "03" en consultas 8904*
+  let totalDiag = 0;  // codDiagnosticoRelacionado* puestos a null por duplicar al principal
+  let totalOsAut = 0; // numAutorizacion de otrosServicios puestos a null por ajuste (6)
+  const summary = [];
+
+  // Códigos codTecnologiaSalud de otrosServicios cuyo numAutorizacion queda en null.
+  // Lista fija por regla de negocio; comparación insensible a mayúsculas/espacios.
+  const SPECIAL_OS_CODES = new Set([
+    '2DS002','2DS003','5DS002','5DS003','5DS004',
+    '7DS001','7DS002','7DS003','7DS004','7DS005','7DS006',
+  ]);
+
+  // Nodos donde revisamos duplicados principal/relacionado. Mantenemos todos los
+  // tipos que puedan contener codDiagnosticoPrincipal + codDiagnosticoRelacionado(1|2|3).
+  const DIAG_TIPOS = ['consultas','procedimientos','medicamentos','otrosServicios','urgencias','hospitalizacion'];
+  // Igualdad "sensata" para códigos de diagnóstico: ignora espacios y mayúsculas.
+  // Un valor null nunca se considera duplicado.
+  const sameDiag = (a, b) => {
+    if (a == null || b == null) return false;
+    const na = String(a).trim().toUpperCase();
+    const nb = String(b).trim().toUpperCase();
+    if (!na || !nb) return false;
+    return na === nb;
+  };
+
+  keys.forEach(key => {
+    const f = state.files[key];
+    if (!f || !f.raw) return;
+
+    const usuarios = Array.isArray(f.raw.usuarios) ? f.raw.usuarios : [];
+    let nomInFile = 0;
+    let urgInFile = 0;
+    let grupoInFile = 0;
+    let diagInFile = 0;
+    let osAutInFile = 0;
+
+    usuarios.forEach((u, uIdx) => {
+      const servicios = u && u.servicios;
+      if (!servicios) return;
+
+      // (1) otrosServicios → nomTecnologiaSalud = null si tipoOS !== "01"
+      //     "tipoOS" solo se LEE aquí; nunca se modifica.
+      (servicios.otrosServicios || []).forEach(item => {
+        if (item && 'tipoOS' in item && String(item.tipoOS) !== '01') {
+          if (item.nomTecnologiaSalud !== null) {
+            item.nomTecnologiaSalud = null;
+            nomInFile++;
+          }
+        }
+      });
+
+      // (2) urgencias → limitar estancia a 48h
+      (servicios.urgencias || []).forEach(item => {
+        if (!item) return;
+        const ini = parseRipsDate(item.fechaInicioAtencion);
+        const egr = parseRipsDate(item.fechaEgreso);
+        if (!ini || !egr) return;
+        if (egr.dt.getTime() - ini.dt.getTime() > MS_48H) {
+          const nuevo = new Date(ini.dt.getTime() + MS_48H);
+          item.fechaEgreso = formatRipsDate(nuevo, egr.hasSeconds);
+          urgInFile++;
+        }
+      });
+
+      // (4) consultas → grupoServicios = "03" cuando codConsulta empieza por "8904"
+      (servicios.consultas || []).forEach(item => {
+        if (!item) return;
+        const cod = String(item.codConsulta ?? '').trim();
+        if (!cod.startsWith('8904')) return;
+        // Si la consulta no traía la clave "grupoServicios", aquí se CREA con "03".
+        // Guarda de idempotencia: si ya está en "03" no se recuenta ni se
+        // vuelve a marcar el archivo como modificado.
+        if (String(item.grupoServicios ?? '') === '03') return;
+        item.grupoServicios = '03';
+        grupoInFile++;
+      });
+
+      // (5) Diagnóstico relacionado duplicado del principal → null.
+      // Cubre tanto la forma singular (procedimientos/medicamentos:
+      // codDiagnosticoRelacionado) como la numerada (consultas y otros:
+      // codDiagnosticoRelacionado1/2/3). Solo se nulifica el relacionado
+      // cuando repite el valor del codDiagnosticoPrincipal; nunca se toca
+      // el principal. Idempotente: un relacionado ya null no se recuenta.
+      DIAG_TIPOS.forEach(tipo => {
+        const items = servicios[tipo];
+        if (!Array.isArray(items)) return;
+        items.forEach(item => {
+          if (!item) return;
+          const princ = item.codDiagnosticoPrincipal;
+          if (princ == null || String(princ).trim() === '') return;
+          // Nombre de llave y valor por cada relacionado a inspeccionar.
+          const relKeys = ['codDiagnosticoRelacionado',
+                           'codDiagnosticoRelacionado1',
+                           'codDiagnosticoRelacionado2',
+                           'codDiagnosticoRelacionado3'];
+          relKeys.forEach(k => {
+            if (!(k in item)) return;         // llave no presente → no se agrega
+            if (item[k] === null) return;     // ya está null → nada que hacer
+            if (sameDiag(princ, item[k])) {
+              item[k] = null;
+              diagInFile++;
+            }
+          });
+        });
+      });
+
+      // (6) otrosServicios → numAutorizacion = null cuando:
+      //     - tipoOS === "01", o
+      //     - codTecnologiaSalud ∈ SPECIAL_OS_CODES.
+      // Idempotente: si numAutorizacion ya es null no se recuenta. Mantiene
+      // row.original intacto en la fila (solo mueve row.current) para preservar
+      // el badge "modificado" y permitir revertir desde la UI.
+      (servicios.otrosServicios || []).forEach((item, idx) => {
+        if (!item) return;
+        if (!('numAutorizacion' in item)) return;
+        if (item.numAutorizacion === null) return;
+        const esTipo01 = String(item.tipoOS ?? '').trim() === '01';
+        const codTS = String(item.codTecnologiaSalud ?? '').trim().toUpperCase();
+        const esCodEspecial = SPECIAL_OS_CODES.has(codTS);
+        if (!esTipo01 && !esCodEspecial) return;
+        item.numAutorizacion = null;
+        osAutInFile++;
+        // Sincroniza row.current (buildRows solo lee usuarios[0], así que
+        // ignoramos otros usuarios: no están reflejados en la tabla).
+        if (uIdx === 0 && Array.isArray(f.rows)) {
+          const row = f.rows.find(r => r.tipo === 'otrosServicios' && r.idx === idx);
+          if (row) row.current = null;
+        }
+      });
+    });
+
+    if (nomInFile > 0 || urgInFile > 0 || grupoInFile > 0 || diagInFile > 0 || osAutInFile > 0) {
+      filesAffected++;
+      totalNom += nomInFile;
+      totalUrg += urgInFile;
+      totalGrupo += grupoInFile;
+      totalDiag += diagInFile;
+      totalOsAut += osAutInFile;
+      // Reconstruir filas para reflejar cambios en la vista (numAutorizacion intacto).
+      // El ajuste (3) NO altera nada que muestren las filas, así que por sí solo no
+      // dispara la reconstrucción: hacerlo reiniciaría la línea base "original" de
+      // las autorizaciones y se perderían las ediciones pendientes del usuario.
+      // (5) tampoco modifica datos mostrados en las filas, igual criterio.
+      // (6) SÍ modifica numAutorizacion visible, pero lo refleja escribiendo
+      // row.current in-place, por lo que tampoco llama a buildRows.
+      if (nomInFile > 0 || urgInFile > 0) {
+        f.rows = buildRows(f.raw);
+      }
+      f.modified = true;
+      summary.push(`• ${f.name}: nomTecnologiaSalud=null ×${nomInFile} · fechaEgreso(48h) ×${urgInFile} · grupoServicios=03 ×${grupoInFile} · diagRelacionado=null ×${diagInFile} · otrosServ.numAut=null ×${osAutInFile}`);
+    }
+  });
+
+  renderSidebar();
+  renderMain();
+
+  if (filesAffected === 0) {
+    toast('No se encontraron registros que requieran ajuste', 'warn');
+    return;
+  }
+
+  console.log('Otros ajustes - resumen:\n' + summary.join('\n'));
+  toast(`🛠 Ajustes aplicados: ${totalNom} nomTecnologiaSalud=null · ${totalUrg} urgencias ≤48h · ${totalGrupo} consultas 8904*→grupo 03 · ${totalDiag} diagRelacionado=null · ${totalOsAut} otrosServ.numAut=null en ${filesAffected} archivo${filesAffected !== 1 ? 's' : ''}`);
+}
+
+document.getElementById('btnOtrosAjustes').addEventListener('click', applyOtrosAjustes);
+
+// ── Filtros de selección de archivos para "Descargar todos (7z)" ──────────────
+// (1) Seleccionar todos: marca todos los archivos cargados.
+// (2) Seleccionar modificados: marca únicamente los que tienen estado "Modificado".
+document.getElementById('btnSelectAllFiles').addEventListener('click', () => {
+  const keys = Object.keys(state.files);
+  if (!keys.length) return;
+  state.selectedFiles = new Set(keys);
+  renderSidebar();
+  toast(`✓ ${keys.length} archivo${keys.length !== 1 ? 's' : ''} marcado${keys.length !== 1 ? 's' : ''} para la descarga`);
+});
+
+document.getElementById('btnSelectModFiles').addEventListener('click', () => {
+  const modKeys = Object.keys(state.files).filter(k => state.files[k].modified);
+  state.selectedFiles = new Set(modKeys);
+  renderSidebar();
+  if (modKeys.length === 0) {
+    toast('No hay archivos modificados para marcar', 'warn');
+  } else {
+    toast(`✓ ${modKeys.length} archivo${modKeys.length !== 1 ? 's' : ''} modificado${modKeys.length !== 1 ? 's' : ''} marcado${modKeys.length !== 1 ? 's' : ''} para la descarga`);
+  }
+});
+
+// ── Botón "NA" — ajuste de nota sobre archivos MODIFICADOS ────────────────────
+// Solo en archivos con estado "Modificado":
+//   • numNota: null  →  se fija la constante "NA-1"
+//   • tipoNota: null →  se fija la constante "NA"
+// Los archivos sin cambios (no modificados) no se tocan.
+function applyAjusteNota() {
+  const modKeys = Object.keys(state.files).filter(k => state.files[k].modified);
+  if (!modKeys.length) {
+    toast('No hay archivos modificados: el ajuste "NA" no aplica', 'warn');
+    return;
+  }
+
+  let filesAffected = 0;
+  let numNotaSet = 0;
+  let tipoNotaSet = 0;
+  const summary = [];
+
+  modKeys.forEach(key => {
+    const f = state.files[key];
+    if (!f || !f.raw) return;
+
+    let changed = false;
+    let nn = 0, tn = 0;
+
+    // numNota: null → constante "NA-1"
+    if (f.raw.numNota === null || f.raw.numNota === undefined || f.raw.numNota === '') {
+      f.raw.numNota = 'NA-1';
+      nn = 1;
+      numNotaSet++;
+      changed = true;
+    }
+
+    // tipoNota: null → constante "NA"
+    if (f.raw.tipoNota === null || f.raw.tipoNota === undefined || f.raw.tipoNota === '') {
+      f.raw.tipoNota = 'NA';
+      tn = 1;
+      tipoNotaSet++;
+      changed = true;
+    }
+
+    if (changed) {
+      filesAffected++;
+      f.modified = true;
+      summary.push(`• ${f.name}: numNota${nn ? `="${f.raw.numNota}"` : '(sin cambio)'} · tipoNota${tn ? '="NA"' : '(sin cambio)'}`);
+    }
+  });
+
+  renderSidebar();
+  renderMain();
+
+  if (filesAffected === 0) {
+    toast('Los archivos modificados ya tenían numNota y tipoNota asignados', 'warn');
+    return;
+  }
+
+  console.log('Ajuste NA - resumen:\n' + summary.join('\n'));
+  const msg = `🏷 NA aplicado: numNota="NA-1"×${numNotaSet} · tipoNota="NA"×${tipoNotaSet} en ${filesAffected} archivo${filesAffected !== 1 ? 's' : ''} modificado${filesAffected !== 1 ? 's' : ''}`;
+  toast(msg);
+}
+
+document.getElementById('btnAjusteNota').addEventListener('click', applyAjusteNota);
+
+// ── Botón "(-) NA" — revierte el ajuste de nota hecho por el botón "NA" ──────
+// Deja los campos como estaban antes de pulsar "NA":
+//   • numNota  === "NA-1"  →  null
+//   • tipoNota === "NA"    →  null
+// SEGURIDAD: revierte ÚNICAMENTE esos dos valores exactos (los que escribe
+// "NA"). Un numNota/tipoNota con cualquier otro contenido es una nota real del
+// prestador y NO se toca, para no destruir información de radicación.
+function revertAjusteNota() {
+  const keys = Object.keys(state.files);
+  if (!keys.length) {
+    toast('No hay archivos cargados', 'warn');
+    return;
+  }
+
+  let filesAffected = 0;
+  let numNotaCleared = 0;
+  let tipoNotaCleared = 0;
+  const summary = [];
+
+  keys.forEach(key => {
+    const f = state.files[key];
+    if (!f || !f.raw) return;
+
+    let changed = false;
+    let nn = 0, tn = 0;
+
+    // numNota: "NA-1" → null
+    if (f.raw.numNota === 'NA-1') {
+      f.raw.numNota = null;
+      nn = 1;
+      numNotaCleared++;
+      changed = true;
+    }
+
+    // tipoNota: "NA" → null
+    if (f.raw.tipoNota === 'NA') {
+      f.raw.tipoNota = null;
+      tn = 1;
+      tipoNotaCleared++;
+      changed = true;
+    }
+
+    if (changed) {
+      filesAffected++;
+      f.modified = true;
+      summary.push(`• ${f.name}: numNota${nn ? '=null' : '(sin cambio)'} · tipoNota${tn ? '=null' : '(sin cambio)'}`);
+    }
+  });
+
+  renderSidebar();
+  renderMain();
+
+  if (filesAffected === 0) {
+    toast('No hay nada que revertir: ningún archivo tiene numNota="NA-1" ni tipoNota="NA"', 'warn');
+    return;
+  }
+
+  console.log('Reversión NA - resumen:\n' + summary.join('\n'));
+  toast(`🏷 NA revertido: numNota=null ×${numNotaCleared} · tipoNota=null ×${tipoNotaCleared} en ${filesAffected} archivo${filesAffected !== 1 ? 's' : ''}`);
+}
+
+const btnNaUndo = document.getElementById('btnAjusteNotaUndo');
+if (btnNaUndo) btnNaUndo.addEventListener('click', revertAjusteNota);
+
 // Descarga todos los archivos en un único 7z, conservando el nombre original
 // (sin sufijo _corregido) y SIN crear subcarpetas: todos los JSON quedan en la
 // raíz del archivo .7z, tal cual fueron cargados. Usa 7z-wasm (7-Zip 24.09
@@ -3555,10 +4533,107 @@ async function get7zInstance() {
   }
 }
 
-async function downloadAllAs7z() {
-  const keys = Object.keys(state.files);
+// Nombre de salida de cada archivo dentro del comprimido.
+// Regla: se usa el "numFactura" del encabezado del RIPS (11364984 -> 11364984.json).
+// Si el campo falta o está vacío, se conserva el nombre con el que se cargó.
+function buildOutputName(f) {
+  const nf = f && f.raw ? f.raw.numFactura : null;
+  const factura = (nf === undefined || nf === null) ? '' : String(nf).trim();
+  if (factura) return `${factura}.json`;
+  return f.name.endsWith('.json') ? f.name : `${f.name}.json`;
+}
+
+// Evita que dos archivos con el mismo numFactura se pisen dentro del comprimido.
+function dedupeName(nombre, usedNames) {
+  if (!usedNames.has(nombre)) { usedNames.add(nombre); return nombre; }
+  const dot = nombre.lastIndexOf('.');
+  const base = dot > 0 ? nombre.slice(0, dot) : nombre;
+  const ext  = dot > 0 ? nombre.slice(dot) : '';
+  let n = 2;
+  while (usedNames.has(`${base}_${n}${ext}`)) n++;
+  const final = `${base}_${n}${ext}`;
+  usedNames.add(final);
+  return final;
+}
+
+// Empaqueta los archivos marcados en un ZIP (alternativa al 7z).
+async function downloadAllAsZip() {
+  const keys = Object.keys(state.files).filter(k => state.selectedFiles.has(k));
   if (!keys.length) {
+    toast('No hay archivos marcados para descargar', 'warn');
+    return;
+  }
+  if (typeof JSZip === 'undefined') {
+    toast('No se pudo cargar la librería ZIP desde el CDN', 'warn');
+    return;
+  }
+
+  const btn = document.getElementById('btnExportAll');
+  const prevHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Comprimiendo…';
+
+  try {
+    const zip = new JSZip();
+    const usedNames = new Set();
+    let count = 0;
+
+    keys.forEach(key => {
+      const f = state.files[key];
+      if (!f || !f.raw) return;
+      let nombre = buildOutputName(f).replace(/[\/\\:*?"<>|]+/g, '_') || 'archivo.json';
+      nombre = dedupeName(nombre, usedNames);
+      zip.file(nombre, JSON.stringify(f.raw, null, 2));
+      count++;
+    });
+
+    if (!count) {
+      toast('No hay archivos válidos para comprimir', 'warn');
+      return;
+    }
+
+    const ts = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `RIPS_${stamp}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    toast(`📦 ${count} archivo${count !== 1 ? 's' : ''} comprimido${count !== 1 ? 's' : ''} en ZIP`);
+  } catch (err) {
+    console.error('Error al generar ZIP:', err);
+    toast(`Error al generar el archivo ZIP: ${err.message || err}`, 'warn');
+  } finally {
+    btn.innerHTML = prevHtml;
+    btn.disabled = false;
+    syncFileSelectionUI();
+  }
+}
+
+// Enruta la descarga según el formato elegido por el usuario.
+function downloadAllArchive() {
+  const sel = document.getElementById('selArchiveFormat');
+  const fmt = sel ? sel.value : '7z';
+  if (fmt === 'zip') return downloadAllAsZip();
+  return downloadAllAs7z();
+}
+
+async function downloadAllAs7z() {
+  // Solo se descargan los archivos marcados con la casilla de validación.
+  const keys = Object.keys(state.files).filter(k => state.selectedFiles.has(k));
+  if (!Object.keys(state.files).length) {
     toast('No hay archivos para descargar', 'warn');
+    return;
+  }
+  if (!keys.length) {
+    toast('Marca al menos un archivo con la casilla para descargar', 'warn');
     return;
   }
 
@@ -3589,20 +4664,14 @@ async function downloadAllAs7z() {
     keys.forEach(key => {
       const f = state.files[key];
       if (!f || !f.raw) return;
-      // Nombre del archivo: tal cual viene cargado (sin sufijo agregado)
-      let nombre = f.name.endsWith('.json') ? f.name : `${f.name}.json`;
+      // Nombre del archivo: se toma del campo "numFactura" del propio RIPS
+      // (p. ej. numFactura "11364984" -> 11364984.json). Si por algún motivo
+      // ese campo viniera vacío, se cae al nombre original del archivo.
+      let nombre = buildOutputName(f);
       // Sanitizar caracteres no válidos para nombre de archivo en el 7z
       nombre = nombre.replace(/[\/\\:*?"<>|]+/g, '_') || 'archivo.json';
-      // Evitar colisiones si dos archivos cargados tuvieran exactamente el mismo nombre
-      if (usedNames.has(nombre)) {
-        const dot = nombre.lastIndexOf('.');
-        const base = dot > 0 ? nombre.slice(0, dot) : nombre;
-        const ext = dot > 0 ? nombre.slice(dot) : '';
-        let n = 2;
-        while (usedNames.has(`${base}_${n}${ext}`)) n++;
-        nombre = `${base}_${n}${ext}`;
-      }
-      usedNames.add(nombre);
+      // Evitar colisiones si dos archivos compartieran el mismo numFactura
+      nombre = dedupeName(nombre, usedNames);
       const json = JSON.stringify(f.raw, null, 2);
       const filePath = `${workDir}/${nombre}`;
       sevenZip.FS.writeFile(filePath, json);
@@ -3669,7 +4738,108 @@ async function downloadAllAs7z() {
   }
 }
 
-document.getElementById('btnExportAll').addEventListener('click', downloadAllAs7z);
+document.getElementById('btnExportAll').addEventListener('click', downloadAllArchive);
+
+// ── Puente hacia el "Corrector RIPS + OCR" ───────────────────────────────────
+// El Editor y el Corrector son dos archivos HTML independientes. Para que el
+// Corrector arranque con los RIPS que ya están cargados aquí (en vez de pedir
+// que el usuario los vuelva a seleccionar), se deja el lote en una base
+// IndexedDB compartida y luego se abre el Corrector en una pestaña nueva. El
+// Corrector, al iniciar, busca ese registro, lo consume y lo borra.
+//
+// Se usa IndexedDB (no localStorage) porque un lote de RIPS supera con
+// facilidad el límite de ~5 MB de localStorage.
+const HANDOFF_DB_NAME  = 'rips_editor_handoff';
+const HANDOFF_STORE    = 'handoff';
+const HANDOFF_KEY      = 'pending_batch';
+
+function openHandoffDB() {
+  return new Promise(resolve => {
+    if (!window.indexedDB) { resolve(null); return; }
+    const req = indexedDB.open(HANDOFF_DB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(HANDOFF_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => resolve(null);
+  });
+}
+
+// Deja el lote actual disponible para el Corrector.
+// Envía los archivos MARCADOS (los mismos que entran en "Descargar todos");
+// si no hubiera ninguno marcado, envía todos los cargados.
+async function handoffToCorrector() {
+  const allKeys = Object.keys(state.files);
+  if (!allKeys.length) {
+    toast('No hay archivos cargados', 'warn');
+    return;
+  }
+
+  let keys = allKeys.filter(k => state.selectedFiles.has(k));
+  if (!keys.length) keys = allKeys;
+
+  const payload = [];
+  keys.forEach(key => {
+    const f = state.files[key];
+    if (!f || !f.raw) return;
+    const nombre = f.name.endsWith('.json') ? f.name : `${f.name}.json`;
+    // Se envía una COPIA PROFUNDA del contenido ya EDITADO en el Editor
+    // (numAutorizacion, fechas, "Otros ajustes", NA, etc.). El clon evita que
+    // el Corrector reciba una referencia viva o una instantánea ambigua: lo que
+    // se guarda es exactamente el estado de f.raw en este instante.
+    let snapshot;
+    try {
+      snapshot = (typeof structuredClone === 'function')
+        ? structuredClone(f.raw)
+        : JSON.parse(JSON.stringify(f.raw));
+    } catch (e) {
+      snapshot = JSON.parse(JSON.stringify(f.raw));
+    }
+    payload.push({
+      fileName: nombre,
+      data: snapshot,
+      modified: !!f.modified,
+    });
+  });
+
+  if (!payload.length) {
+    toast('No hay archivos válidos para enviar', 'warn');
+    return;
+  }
+
+  const db = await openHandoffDB();
+  if (!db) {
+    toast('Este navegador no permite IndexedDB; no se puede enlazar el Corrector', 'warn');
+    return;
+  }
+
+  const ok = await new Promise(resolve => {
+    try {
+      const tx = db.transaction(HANDOFF_STORE, 'readwrite');
+      tx.objectStore(HANDOFF_STORE).put({
+        files: payload,
+        origin: 'Editor RIPS',
+        batchId: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        savedAt: Date.now(),
+      }, HANDOFF_KEY);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror    = () => resolve(false);
+    } catch (e) { resolve(false); }
+  });
+
+  if (!ok) {
+    toast('No se pudo preparar el envío al Corrector', 'warn');
+    return;
+  }
+
+  toast(`🔎 Enviando ${payload.length} archivo${payload.length !== 1 ? 's' : ''} al Corrector OCR…`);
+
+  // El Corrector debe estar en la misma carpeta que este archivo.
+  const win = window.open('corrector_rips_autorizaciones_10_2.html', '_blank');
+  if (!win) {
+    toast('El navegador bloqueó la ventana emergente. Permita las ventanas emergentes y vuelva a intentarlo.', 'warn');
+  }
+}
+
+document.getElementById('btnOpenCorrectorOCR').addEventListener('click', handoffToCorrector);
 
 // Drop e input
 const dropZone = document.getElementById('dropZone');
@@ -3677,7 +4847,7 @@ const fileInput = document.getElementById('fileInput');
 
 dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', e => {
-  [...e.target.files].forEach(loadFile);
+  loadFiles(e.target.files);
   fileInput.value = '';
 });
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
@@ -3685,7 +4855,7 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-ove
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
-  [...e.dataTransfer.files].filter(f => f.name.endsWith('.json')).forEach(loadFile);
+  loadFiles([...e.dataTransfer.files].filter(f => f.name.endsWith('.json')));
 });
 
 // Toast
@@ -4134,25 +5304,76 @@ function initDateEditorRangePicker() {
   const el = document.getElementById('deRangoFecha');
   if (!el) return;
   if (el._flatpickr) { el._flatpickr.destroy(); }
-  flatpickr(el, {
+  const fp = flatpickr(el, {
     mode: "range",
     dateFormat: "Y-m-d",
     altInput: true,
     altFormat: "d-m-Y",
     allowInput: false,
     locale: "es",
+    // El calendario se cuelga del <body> y se posiciona automáticamente. Así no
+    // queda recortado por el `overflow:hidden` del modal del editor de fechas.
+    appendTo: document.body,
+    static: false,
+    position: "auto",
+    clickOpens: true,
     defaultDate: [dateEditorState.filter.fechaDesde || null, dateEditorState.filter.fechaHasta || null].filter(Boolean),
+    // IMPORTANTE: en modo "range" flatpickr dispara onChange también en el
+    // PRIMER clic (con una sola fecha aún). Si en ese momento se repinta la
+    // tabla, el re-render puede interrumpir la selección y el segundo clic se
+    // pierde, de modo que el rango nunca llega a completarse. Por eso aquí solo
+    // se guarda el estado, sin repintar, mientras la selección está a medias.
     onChange: (selectedDates) => {
       if (selectedDates.length === 2) {
-        dateEditorState.filter.fechaDesde = selectedDates[0].toISOString().split('T')[0];
-        dateEditorState.filter.fechaHasta = selectedDates[1].toISOString().split('T')[0];
-      } else {
+        dateEditorState.filter.fechaDesde = toLocalISODate(selectedDates[0]);
+        dateEditorState.filter.fechaHasta = toLocalISODate(selectedDates[1]);
+        renderDateEditorTable();          // rango completo: ya se puede filtrar
+      } else if (selectedDates.length === 0) {
         dateEditorState.filter.fechaDesde = '';
         dateEditorState.filter.fechaHasta = '';
+        renderDateEditorTable();          // se limpió: volver a mostrar todo
       }
-      renderDateEditorTable();
+      // selectedDates.length === 1 -> selección a medias: NO se repinta nada.
+    },
+    // Red de seguridad: si el usuario cierra el calendario con un rango
+    // completo que aún no se hubiera aplicado, se aplica aquí.
+    onClose: (selectedDates) => {
+      if (selectedDates.length === 2) {
+        const d = toLocalISODate(selectedDates[0]);
+        const h = toLocalISODate(selectedDates[1]);
+        if (d !== dateEditorState.filter.fechaDesde || h !== dateEditorState.filter.fechaHasta) {
+          dateEditorState.filter.fechaDesde = d;
+          dateEditorState.filter.fechaHasta = h;
+          renderDateEditorTable();
+        }
+      }
     }
   });
+
+  // Con `altInput:true` flatpickr oculta el input original y muestra uno nuevo.
+  // Si por layout ese input alterno quedara sin recibir el clic, este respaldo
+  // garantiza que el calendario abra igualmente.
+  // No se usa preventDefault para no interferir con el manejo propio de
+  // flatpickr: solo se comprueba, un instante después del clic, si el
+  // calendario efectivamente abrió; si no, se fuerza la apertura.
+  const visible = (fp && fp.altInput) ? fp.altInput : el;
+  if (visible && !visible._deOpenBound) {
+    visible._deOpenBound = true;
+    visible.addEventListener('click', () => {
+      setTimeout(() => { if (fp && !fp.isOpen) fp.open(); }, 0);
+    });
+  }
+  return fp;
+}
+
+// Convierte un Date a "YYYY-MM-DD" usando la fecha LOCAL.
+// Antes se usaba toISOString(), que convierte a UTC: en Colombia (UTC-5) eso
+// devolvía el día anterior para fechas seleccionadas de madrugada, y el filtro
+// de rango dejaba fuera filas que sí debían aparecer.
+function toLocalISODate(d) {
+  if (!(d instanceof Date) || isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 // Listeners del editor de fechas
@@ -4231,13 +5452,16 @@ document.getElementById('btnDeClearDates').addEventListener('click', () => {
 function countAlertsForFile(f) {
   if (!f || !f.raw) return 0;
   let n = 0;
-  const TAP_CODES = new Set(['601T01', '601T02']);
+  const TAP_CODES = new Set(['601T01', '601T02','602T01','602T02']);
   const UMBRAL = 48 * 60 * 60 * 1000;
   const servicios = f.raw.usuarios?.[0]?.servicios || {};
 
   f.rows.forEach(r => {
-    if (r.current === null || r.current === '') n++;
-    else if (String(r.current).length !== 9) n++;
+    // La alerta de "autorización null" fue retirada: null/undefined se omiten.
+    // La cadena vacía SÍ sigue contando por longitud ≠ 9, igual que en el CSV
+    // (exportAlertsCsv, Alerta 4): así el badge y el CSV no divergen.
+    if (r.current === null || r.current === undefined) return;
+    if (String(r.current).length !== 9) n++;
   });
 
   const otros = Array.isArray(servicios.otrosServicios) ? servicios.otrosServicios : [];
@@ -4259,11 +5483,6 @@ function countAlertsForFile(f) {
     });
   });
 
-  if (urg.length) {
-    const hosp = Array.isArray(servicios.hospitalizacion) ? servicios.hospitalizacion : [];
-    const tiene5DSA01 = otros.some(i => i?.codTecnologiaSalud === '5DSA01');
-    if (!hosp.length && !tiene5DSA01) n++;
-  }
   return n;
 
   function parseDate(raw) {
@@ -4431,7 +5650,7 @@ document.addEventListener('keydown', e => {
   // Ctrl/Cmd + Shift + D -> descargar todos en 7z
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
     e.preventDefault();
-    if (!document.getElementById('btnExportAll').disabled) downloadAllAs7z();
+    if (!document.getElementById('btnExportAll').disabled) downloadAllArchive();
     return;
   }
 
@@ -4519,8 +5738,8 @@ const SOP_RULES_BY_SERVICE = {
     conditional: ['OPF', 'PDX', 'DQX', 'RAN', 'CRC']
   },
   medicamentos: {
-    required: ['CRC'],
-    conditional: ['OPF', 'HAM']
+    required: ['HAM'],
+    conditional: ['OPF', 'CRC']
   },
   otrosServicios: {
     // Engloba dispositivos médicos y transporte
@@ -4533,7 +5752,7 @@ const SOP_RULES_BY_SERVICE = {
   },
   urgencias: {
     // HAU o EPI (si hubo observación)
-    required: ['HAU', 'HAM'],
+    required: ['HAU'],
     conditional: ['EPI', 'PDX', 'LDP', 'FAT']
   }
 };
@@ -4640,7 +5859,7 @@ const sopState = {
 
       <div class="sop-body" id="sopBody">
         <div class="sop-empty" id="sopEmpty">
-          <div class="icon">📭</div>
+          <div class="icon brand-empty-icon"></div>
           <p>
             <b>¿Cómo se usa?</b><br>
             1. Carga al menos un RIPS JSON desde la barra lateral.<br>
@@ -4656,6 +5875,7 @@ const sopState = {
         <span class="hint" id="sopHint">Sin escaneo todavía.</span>
         <div class="btns">
           <button class="btn-ghost" id="btnSopHelp" type="button">📖 Ver nomenclatura</button>
+          <button class="btn-export" id="btnSopRenameHau" type="button" title="Duplicado EPI→HAU según la regla de soporte HAU (factura con nodo de urgencias).">📄 Duplicar EPI→HAU</button>
           <button class="btn-export" id="btnSopExportCsv" type="button" disabled>⬇ Exportar CSV de alertas</button>
         </div>
       </div>
@@ -4906,11 +6126,12 @@ function sopRender() {
   const body = document.getElementById('sopBody');
   const summary = document.getElementById('sopSummary');
   const exportBtn = document.getElementById('btnSopExportCsv');
+  const renameBtn = document.getElementById('btnSopRenameHau');
   const hint = document.getElementById('sopHint');
 
   if (!sopState.hasScan) {
     body.innerHTML = `<div class="sop-empty" id="sopEmpty">
-      <div class="icon">📭</div>
+      <div class="icon brand-empty-icon"></div>
       <p>
         <b>¿Cómo se usa?</b><br>
         1. Carga al menos un RIPS JSON desde la barra lateral.<br>
@@ -4921,6 +6142,7 @@ function sopRender() {
     </div>`;
     summary.innerHTML = '';
     exportBtn.disabled = true;
+    if (renameBtn) { renameBtn.disabled = false; renameBtn.textContent = '📄 Duplicar EPI→HAU'; }
     hint.textContent = 'Sin escaneo todavía.';
     return;
   }
@@ -4940,10 +6162,20 @@ function sopRender() {
   `;
 
   exportBtn.disabled = sopState.results.length === 0;
+  if (renameBtn) {
+    const hauTargets = sopComputeHauRenameTargets();
+    const nFact = hauTargets.length;
+    const nFiles = hauTargets.reduce((acc, t) => acc + t.epiFiles.length, 0);
+    renameBtn.disabled = false; // siempre activo: si no hay facturas, al pulsar se informa con un mensaje emergente
+    renameBtn.textContent = nFact ? `📄 Duplicar EPI→HAU (${nFact})` : '📄 Duplicar EPI→HAU';
+    renameBtn.title = nFact
+      ? `Genera un script (CMD/PowerShell) para DUPLICAR ${nFiles} PDF de EPI y nombrar la copia como HAU EN SITIO, en ${nFact} factura(s) donde aplica la regla de soporte HAU (factura con nodo de urgencias) y el HAU falta en los PDF. No descarga los soportes; el EPI original se conserva.`
+      : 'Duplicado EPI→HAU según la regla de soporte HAU. Pulsa para ver el estado.';
+  }
   hint.innerHTML = `Carpeta: <b>${escapeHtml(sopState.selectedFolderName || '—')}</b> · ${sopState.filteredResults.length}/${total} resultados visibles`;
 
   if (sopState.filteredResults.length === 0) {
-    body.innerHTML = `<div class="sop-empty"><div class="icon">🔍</div><p>No hay resultados con los filtros aplicados.</p></div>`;
+    body.innerHTML = `<div class="sop-empty"><div class="icon brand-empty-icon"></div><p>No hay resultados con los filtros aplicados.</p></div>`;
     return;
   }
 
@@ -5062,6 +6294,371 @@ function sopExportCsv() {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   if (typeof toast === 'function') toast('✓ CSV exportado con la verificación de soportes');
+}
+
+// ===================================================================
+// DUPLICAR EPI -> HAU  ·  Generador de script (CMD / PowerShell)
+// -------------------------------------------------------------------
+// Para las facturas donde aplica la REGLA DE SOPORTE HAU de este verificador
+// (urgencias en usuarios[0], sin supresores), cuyo HAU falta en los
+// PDF y que tienen un EPI disponible, esta utilidad NO vuelve a descargar los
+// soportes: genera un script (.bat para CMD y .ps1 para PowerShell) que el
+// usuario ejecuta DENTRO de la misma carpeta raíz ya existente para DUPLICAR
+// el soporte EPI EN SITIO y nombrar la copia con el prefijo "HAU_".
+// IMPORTANTE: el EPI original SE CONSERVA (se copia, no se renombra). La copia
+// solo cambia el prefijo inicial "EPI_" por "HAU_"; el resto del nombre (NIT,
+// numFactura, sufijo de paciente) y el contenido quedan intactos. Nada de la
+// verificación existente se modifica: esto solo agrega una salida adicional.
+// ===================================================================
+
+// Nombre de la COPIA: cambia únicamente el prefijo inicial "EPI_" por "HAU_" y
+// conserva el resto del nombre exactamente igual (NIT, numFactura, sufijo,
+// extensión).
+function sopEpiToHauName(filename) {
+  return String(filename).replace(/^EPI_/i, 'HAU_');
+}
+
+// Regla de soporte HAU propia de este verificador, evaluada a nivel de
+// archivo RIPS: se dispara SIEMPRE que usuarios[0] tenga urgencias con al menos
+// un ítem. SIN supresores: ni la hospitalización con ítems ni el código
+// codTecnologiaSalud '5DSA01' en otrosServicios suprimen ya la alerta. Devuelve
+// el numFactura (string) si aplica, o null. Es independiente del CSV de
+// alertas: la antigua Alerta 6 fue retirada de allí.
+function sopRipsHauAlertFactura(f) {
+  if (!f || !f.raw) return null;
+  const raw = f.raw;
+  const numFacturaGlobal = raw.numFactura || raw.factura?.numFactura || raw.encabezado?.numFactura || '';
+  const servicios = raw.usuarios?.[0]?.servicios || {};
+  const urgencias = Array.isArray(servicios.urgencias) ? servicios.urgencias : [];
+  if (urgencias.length === 0) return null; // sin urgencias en usuarios[0] → no aplica
+  const primerUrg = urgencias[0] || {};
+  return String(primerUrg.numFactura || numFacturaGlobal || '').trim();
+}
+
+// Conjunto de numFactura donde aplica la regla de soporte HAU, calculado
+// sobre los RIPS JSON cargados en el editor.
+function sopGetRipsHauAlertFacturas() {
+  const set = new Set();
+  Object.values(state.files || {}).forEach(f => {
+    const nf = sopRipsHauAlertFactura(f);
+    if (nf) set.add(nf);
+  });
+  return set;
+}
+
+// Facturas que aplican para duplicar EPI -> HAU. La factura debe cumplir la
+// regla de soporte HAU de este verificador (urgencias en
+// usuarios[0], sin supresores). Además, para que la duplicación tenga sentido,
+// el HAU debe faltar en los PDF y debe existir un EPI que duplicar.
+function sopComputeHauRenameTargets() {
+  const alertSet = sopGetRipsHauAlertFacturas();
+  const targets = [];
+  (sopState.results || []).forEach(r => {
+    // 1) Alinear con la regla de soporte HAU (urgencias, sin supresores)
+    if (!alertSet.has(String(r.numFactura).trim())) return;
+    // 2) Revisar los PDF reales de la factura (misma fuente del escaneo):
+    //    si el HAU ya está presente no hay nada que corregir; si falta,
+    //    reunir los EPI disponibles para duplicar.
+    const rawList = (sopState.rawFiles && sopState.rawFiles.get(r.numFactura)) || [];
+    let hasHau = false;
+    const epiFiles = [];
+    rawList.forEach(file => {
+      const parsed = sopParseFilename(file.name);
+      if (!parsed.valid) return;
+      if (parsed.prefix === 'HAU') hasHau = true;
+      else if (parsed.prefix === 'EPI') epiFiles.push(file);
+    });
+    if (hasHau || epiFiles.length === 0) return;
+    targets.push({ numFactura: r.numFactura, rawList, epiFiles });
+  });
+  return targets;
+}
+
+// Construye las rutas relativas (a la carpeta raíz seleccionada) de cada EPI a
+// duplicar, más los scripts .ps1 y .bat listos para ejecutar.
+function sopBuildRenameScripts() {
+  const targets = sopComputeHauRenameTargets();
+  const rootName = sopState.selectedFolderName || '(carpeta raiz)';
+
+  const entries = [];
+  targets.forEach(t => {
+    t.epiFiles.forEach(file => {
+      let relParts;
+      if (file.webkitRelativePath) {
+        const p = file.webkitRelativePath.split('/').filter(Boolean);
+        relParts = p.slice(1); // quitar el nombre de la carpeta raíz seleccionada
+        if (relParts.length === 0) relParts = [file.name];
+      } else {
+        relParts = [String(t.numFactura), file.name]; // respaldo: subcarpeta = numFactura
+      }
+      const oldName = relParts[relParts.length - 1];
+      const newName = sopEpiToHauName(oldName);
+      const dirWin  = relParts.slice(0, -1).join('\\');
+      const srcWin  = relParts.join('\\');
+      const dstWin  = (dirWin ? dirWin + '\\' : '') + newName;
+      entries.push({ factura: t.numFactura, dirWin, oldName, newName, srcWin, dstWin });
+    });
+  });
+
+  // -------- PowerShell (.ps1) --------
+  const psq = s => "'" + String(s).replace(/'/g, "''") + "'";
+  const psL = [];
+  psL.push('# =========================================================');
+  psL.push('#  Duplicado de soportes EPI -> HAU  (LaCardio)');
+  psL.push('#  Generado por el Verificador de soportes RIPS');
+  psL.push('#  Carpeta raiz esperada: ' + String(rootName).replace(/[\r\n]+/g, ' '));
+  psL.push('#  1) Guarda este archivo DENTRO de esa carpeta raiz.');
+  psL.push('#  2) Clic derecho > "Ejecutar con PowerShell", o en consola:');
+  psL.push('#       powershell -ExecutionPolicy Bypass -File .\\duplicar_EPI_a_HAU.ps1');
+  psL.push('#  COPIA cada EPI y nombra la copia con el prefijo HAU_.');
+  psL.push('#  El EPI original NO se borra ni se modifica.');
+  psL.push('# =========================================================');
+  psL.push("$ErrorActionPreference = 'Stop'");
+  psL.push('if ($PSScriptRoot) { Set-Location -LiteralPath $PSScriptRoot }');
+  psL.push('$ok = 0; $skip = 0; $miss = 0');
+  psL.push('function Copy-One($src, $new) {');
+  psL.push('  $dir = Split-Path -LiteralPath $src -Parent');
+  psL.push('  $dst = if ($dir) { Join-Path $dir $new } else { $new }');
+  psL.push('  if (-not (Test-Path -LiteralPath $src)) { Write-Host ("NO ENCONTRADO: " + $src) -ForegroundColor Yellow; $script:miss++; return }');
+  psL.push('  if (Test-Path -LiteralPath $dst) { Write-Host ("OMITIDO (destino ya existe): " + $dst) -ForegroundColor Yellow; $script:skip++; return }');
+  psL.push('  Copy-Item -LiteralPath $src -Destination $dst');
+  psL.push('  Write-Host ("OK: " + $src + " -> " + $new) -ForegroundColor Green; $script:ok++');
+  psL.push('}');
+  entries.forEach(e => { psL.push('Copy-One ' + psq(e.srcWin) + ' ' + psq(e.newName)); });
+  psL.push('Write-Host ""');
+  psL.push('Write-Host ("Resumen: " + $ok + " duplicados, " + $skip + " omitidos, " + $miss + " no encontrados.") -ForegroundColor Cyan');
+  psL.push('Write-Host "Listo. Presiona Enter para salir."');
+  psL.push('[void](Read-Host)');
+  const ps = psL.join('\r\n');
+
+  // -------- CMD (.bat) --------
+  const bq = s => '"' + String(s).replace(/%/g, '%%') + '"';
+  const batL = [];
+  batL.push('@echo off');
+  batL.push('chcp 65001 >nul');
+  batL.push('setlocal');
+  batL.push('cd /d "%~dp0"');
+  batL.push('rem =========================================================');
+  batL.push('rem  Duplicado de soportes EPI -^> HAU  (LaCardio)');
+  batL.push('rem  Carpeta raiz esperada: ' + String(rootName).replace(/[\r\n]+/g, ' '));
+  batL.push('rem  Guarda este .bat DENTRO de esa carpeta raiz y ejecutalo (doble clic).');
+  batL.push('rem  COPIA cada EPI y nombra la copia con el prefijo HAU_.');
+  batL.push('rem  El EPI original NO se borra ni se modifica.');
+  batL.push('rem =========================================================');
+  batL.push('set OK=0');
+  batL.push('set SKIP=0');
+  batL.push('set MISS=0');
+  entries.forEach(e => { batL.push('call :do_copy ' + bq(e.srcWin) + ' ' + bq(e.dstWin) + ' ' + bq(e.newName)); });
+  batL.push('goto :summary');
+  batL.push('');
+  batL.push(':do_copy');
+  batL.push('if not exist %1 ( echo NO ENCONTRADO: %~1 & set /a MISS+=1 & goto :eof )');
+  batL.push('if exist %2 ( echo OMITIDO ^(destino ya existe^): %~2 & set /a SKIP+=1 & goto :eof )');
+  batL.push('copy %1 %2 >nul');
+  batL.push('if errorlevel 1 ( echo ERROR al copiar: %~1 & set /a MISS+=1 ) else ( echo OK: %~1 -^> %~3 & set /a OK+=1 )');
+  batL.push('goto :eof');
+  batL.push('');
+  batL.push(':summary');
+  batL.push('echo.');
+  batL.push('echo Resumen: %OK% duplicados, %SKIP% omitidos, %MISS% no encontrados/errores.');
+  batL.push('pause');
+  batL.push('endlocal');
+  const bat = batL.join('\r\n');
+
+  // -------- CMD interactivo (pegar directo en la ventana) --------
+  // Variante SIN etiquetas, SIN call y SIN %~dp0: cada línea es autónoma y
+  // está pensada para PEGARSE en una ventana CMD abierta DENTRO de la carpeta
+  // raíz (los .bat con etiquetas NO funcionan pegados en la consola).
+  // Nota: los nombres provienen de archivos validados por sopParseFilename,
+  // por lo que no contienen %, ^, & ni comillas que requieran escapes en
+  // modo interactivo.
+  const pasteL = [];
+  pasteL.push('rem === Duplicado EPI -> HAU (LaCardio) - pegar en una ventana CMD abierta EN la carpeta raiz: ' + String(rootName).replace(/[\r\n]+/g, ' ') + ' ===');
+  entries.forEach(e => {
+    pasteL.push('if not exist "' + e.srcWin + '" echo NO ENCONTRADO: ' + e.srcWin);
+    pasteL.push('if exist "' + e.srcWin + '" if exist "' + e.dstWin + '" echo OMITIDO (destino ya existe): ' + e.dstWin);
+    pasteL.push('if exist "' + e.srcWin + '" if not exist "' + e.dstWin + '" copy "' + e.srcWin + '" "' + e.dstWin + '" >nul');
+  });
+  pasteL.push('echo Proceso de duplicado terminado.');
+  const cmdPaste = pasteL.join('\r\n');
+
+  return { ps, bat, cmdPaste, entries, targets, facturaCount: targets.length, fileCount: entries.length, rootName };
+}
+
+// Helpers de UI para el diálogo de scripts
+function sopDownloadTextFile(filename, text, withBom) {
+  const content = withBom ? '\uFEFF' + text : text;
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function sopCopyText(text, okMsg) {
+  const done = () => { if (typeof toast === 'function') toast(okMsg || 'Copiado al portapapeles'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => sopCopyFallback(text, done));
+  } else {
+    sopCopyFallback(text, done);
+  }
+}
+function sopCopyFallback(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (_) {}
+  ta.remove();
+}
+
+// Mensaje emergente cuando NO hay facturas que apliquen al duplicado
+// EPI -> HAU según la regla de soporte HAU. Incluye cifras de
+// contexto para que el resultado sea autoexplicativo.
+function sopShowNoHauTargetsDialog() {
+  const alertSet = sopGetRipsHauAlertFacturas();
+  let enAlerta = 0, conHau = 0, sinEpi = 0;
+  (sopState.results || []).forEach(r => {
+    if (!alertSet.has(String(r.numFactura).trim())) return;
+    enAlerta++;
+    const rawList = (sopState.rawFiles && sopState.rawFiles.get(r.numFactura)) || [];
+    let hasHau = false, hasEpi = false;
+    rawList.forEach(file => {
+      const parsed = sopParseFilename(file.name);
+      if (!parsed.valid) return;
+      if (parsed.prefix === 'HAU') hasHau = true;
+      else if (parsed.prefix === 'EPI') hasEpi = true;
+    });
+    if (hasHau) conHau++;
+    else if (!hasEpi) sinEpi++;
+  });
+
+  const prev = document.getElementById('sopRenEmptyOverlay');
+  if (prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sopRenEmptyOverlay';
+  ov.setAttribute('role', 'alertdialog');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px';
+  ov.innerHTML = `
+    <div style="background:var(--surface,#fff);color:var(--text,#111);width:min(560px,94vw);border-radius:12px;border:1px solid var(--border,#ddd);box-shadow:0 20px 60px rgba(0,0,0,.35)">
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border,#eee)">
+        <span style="font-size:20px">📄</span>
+        <div style="font-weight:700;font-size:15px">Duplicar EPI → HAU</div>
+      </div>
+      <div style="padding:18px 20px;font-size:13px;line-height:1.6">
+        <p style="margin:0 0 10px;font-weight:600">No hay facturas para el proceso de duplicado de EPI a HAU.</p>
+        <p style="margin:0 0 4px;color:var(--text2,#555)">Según la regla de soporte HAU (toda factura con nodo de urgencias), ninguna factura del escaneo actual requiere este cambio: en alerta hay <b>${enAlerta}</b> factura(s), de las cuales <b>${conHau}</b> ya cuentan con su soporte HAU y <b>${sinEpi}</b> no tienen un EPI disponible para duplicar.</p>
+        <div style="text-align:right;margin-top:14px">
+          <button type="button" id="sopRenEmptyOk" style="background:var(--brand-navy,#002D72);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:12.5px;font-weight:600">Entendido</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  document.getElementById('sopRenEmptyOk').addEventListener('click', close);
+}
+
+// Muestra un diálogo (sobre el modal de soportes) con los scripts generados.
+function sopShowRenameScriptDialog() {
+  if (!sopState.hasScan) {
+    if (typeof toast === 'function') toast('Primero escanea una carpeta de soportes.', 'warn');
+    return;
+  }
+  const built = sopBuildRenameScripts();
+  if (built.fileCount === 0) {
+    sopShowNoHauTargetsDialog();
+    return;
+  }
+
+  const ts = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}`;
+  const psName  = `duplicar_EPI_a_HAU_${stamp}.ps1`;
+  const batName = `duplicar_EPI_a_HAU_${stamp}.bat`;
+
+  // Quitar diálogo previo si existe
+  const prev = document.getElementById('sopRenOverlay');
+  if (prev) prev.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'sopRenOverlay';
+  ov.setAttribute('role', 'dialog');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px';
+  ov.innerHTML = `
+    <div style="background:var(--surface,#fff);color:var(--text,#111);width:min(920px,96vw);max-height:92vh;overflow:auto;border-radius:12px;border:1px solid var(--border,#ddd);box-shadow:0 20px 60px rgba(0,0,0,.35)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border,#eee);position:sticky;top:0;background:var(--surface,#fff)">
+        <div style="font-weight:700;font-size:15px">📄 Duplicar soportes EPI → HAU (in situ)</div>
+        <button type="button" id="sopRenClose" style="background:var(--surface2,#f2f2f2);border:1px solid var(--border,#ddd);color:var(--text,#111);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px">✕ Cerrar</button>
+      </div>
+      <div style="padding:16px 20px;font-size:12.5px;line-height:1.6">
+        <p style="margin:0 0 8px"><b>${built.fileCount}</b> archivo(s) EPI en <b>${built.facturaCount}</b> factura(s) con regla de soporte HAU aplicable y HAU faltante en los PDF. Este script <b>no descarga nada</b>: duplica los PDF directamente en las carpetas que ya tienes.</p>
+        <ol style="margin:0 0 12px 18px;padding:0">
+          <li>Descarga el script y guárdalo <b>dentro de la carpeta raíz</b> que seleccionaste (<code>${escapeHtml(String(built.rootName))}</code>) — o usa la variante <b>"CMD — pegar directo"</b> de abajo.</li>
+          <li>Ejecútalo ahí. Hace una <b>copia</b> de cada <code>EPI_…</code> y la nombra <code>HAU_…</code>; el resto del nombre queda igual.</li>
+          <li>El <b>EPI original se conserva</b>: no se borra ni se modifica.</li>
+          <li>Si el destino <code>HAU_…</code> ya existe, ese archivo se omite (no se sobrescribe).</li>
+        </ol>
+        <div style="display:flex;flex-wrap:wrap;gap:16px">
+          <div style="flex:1 1 380px;min-width:320px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <b>PowerShell (.ps1) — recomendado</b>
+              <span>
+                <button type="button" id="sopRenCopyPs"  style="background:var(--brand-navy,#002D72);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11.5px">Copiar</button>
+                <button type="button" id="sopRenDlPs"    style="background:var(--success,#0F8A5F);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11.5px">Descargar .ps1</button>
+              </span>
+            </div>
+            <textarea id="sopRenPs" readonly spellcheck="false" style="width:100%;height:200px;font-family:var(--mono,monospace);font-size:11px;line-height:1.45;border:1px solid var(--border,#ddd);border-radius:8px;padding:10px;background:var(--surface2,#fafafa);color:var(--text,#111);white-space:pre;resize:vertical"></textarea>
+            <p style="margin:6px 0 0;color:var(--text3,#888)">Si aparece bloqueo de ejecución: <code>powershell -ExecutionPolicy Bypass -File .\\${psName}</code>. Este script <b>sí admite pegado</b>: puedes copiarlo y pegarlo en una ventana de <b>PowerShell</b> abierta en la carpeta raíz.</p>
+          </div>
+          <div style="flex:1 1 380px;min-width:320px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <b>CMD (.bat)</b>
+              <span>
+                <button type="button" id="sopRenCopyBat" style="background:var(--brand-navy,#002D72);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11.5px">Copiar</button>
+                <button type="button" id="sopRenDlBat"   style="background:var(--success,#0F8A5F);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11.5px">Descargar .bat</button>
+              </span>
+            </div>
+            <textarea id="sopRenBat" readonly spellcheck="false" style="width:100%;height:200px;font-family:var(--mono,monospace);font-size:11px;line-height:1.45;border:1px solid var(--border,#ddd);border-radius:8px;padding:10px;background:var(--surface2,#fafafa);color:var(--text,#111);white-space:pre;resize:vertical"></textarea>
+            <p style="margin:6px 0 0;color:var(--text3,#888)">⚠️ Úsalo <b>solo como archivo</b>: descárgalo, muévelo a la carpeta raíz y ejecútalo con doble clic. <b>No pegues</b> este contenido en la ventana de CMD — las etiquetas (<code>:do_ren</code>) fallan al pegar; para eso usa la variante de abajo.</p>
+          </div>
+          <div style="flex:1 1 100%;min-width:320px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <b>CMD — pegar directo en la ventana</b>
+              <span>
+                <button type="button" id="sopRenCopyCmd" style="background:var(--brand-navy,#002D72);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11.5px">Copiar</button>
+              </span>
+            </div>
+            <textarea id="sopRenCmdPaste" readonly spellcheck="false" style="width:100%;height:150px;font-family:var(--mono,monospace);font-size:11px;line-height:1.45;border:1px solid var(--border,#ddd);border-radius:8px;padding:10px;background:var(--surface2,#fafafa);color:var(--text,#111);white-space:pre;resize:vertical"></textarea>
+            <p style="margin:6px 0 0;color:var(--text3,#888)">Abre CMD <b>dentro de la carpeta raíz</b> (en el Explorador: barra de direcciones → escribe <code>cmd</code> → Enter), pega todo el contenido y presiona Enter. Sin etiquetas ni variables: hecho para pegarse.</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  // Asignar contenido por .value (evita problemas de escape HTML)
+  document.getElementById('sopRenPs').value  = built.ps;
+  document.getElementById('sopRenBat').value = built.bat;
+  document.getElementById('sopRenCmdPaste').value = built.cmdPaste;
+
+  const close = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  document.getElementById('sopRenClose').addEventListener('click', close);
+  document.getElementById('sopRenCopyPs').addEventListener('click', () => sopCopyText(built.ps, 'Script PowerShell copiado'));
+  document.getElementById('sopRenCopyBat').addEventListener('click', () => sopCopyText(built.bat, 'Script CMD copiado'));
+  document.getElementById('sopRenCopyCmd').addEventListener('click', () => sopCopyText(built.cmdPaste, 'Comandos para pegar en CMD copiados'));
+  document.getElementById('sopRenDlPs').addEventListener('click', () => sopDownloadTextFile(psName, built.ps, true));
+  document.getElementById('sopRenDlBat').addEventListener('click', () => sopDownloadTextFile(batName, built.bat, false));
+
+  if (typeof toast === 'function') {
+    toast(`📄 Script listo: ${built.fileCount} EPI→HAU en ${built.facturaCount} factura(s).`);
+  }
 }
 
 function sopOpen() {
@@ -5855,6 +7452,7 @@ document.getElementById('btnSopReset').addEventListener('click', () => {
   sopUpdateHeaderBadge();
 });
 document.getElementById('btnSopExportCsv').addEventListener('click', sopExportCsv);
+document.getElementById('btnSopRenameHau').addEventListener('click', sopShowRenameScriptDialog);
 document.getElementById('btnSopHelp').addEventListener('click', sopHelp);
 
 // Auditoría IA: bindings
@@ -5963,9 +7561,11 @@ function toDateOnly(raw) {
 }
 
 // Construye un índice por archivo:
-//   byFactura: numFactura -> { fileKey, map, codeMap }
-//   map     : `${code}|${date}` -> [{tipo, idx}]
-//   codeMap : code -> [{tipo, idx}]  (ignora fecha, para CSV sin fecha)
+//   byFactura: numFactura -> { fileKey, map, codeMap, consecMap }
+//   map       : `${code}|${date}` -> [{tipo, idx}]
+//   codeMap   : code -> [{tipo, idx}]  (ignora fecha, para CSV sin fecha)
+//   consecMap : `${tipo}|${consecutivo}` -> {tipo, idx}  (lookup directo por nodo+consecutivo)
+//               y `${consecutivo}` -> [{tipo, idx}]      (cuando no se conoce el nodo)
 function buildBulkAuthIndex() {
   const byFactura = new Map();
   Object.keys(state.files).forEach(fileKey => {
@@ -5974,6 +7574,7 @@ function buildBulkAuthIndex() {
     if (!factura) return;
     const map = new Map();
     const codeMap = new Map();
+    const consecMap = new Map();
     const servicios = f.raw?.usuarios?.[0]?.servicios || {};
     BULK_AUTH_TIPOS.forEach(tipo => {
       const items = servicios[tipo];
@@ -5989,9 +7590,17 @@ function buildBulkAuthIndex() {
           if (!codeMap.has(code)) codeMap.set(code, []);
           codeMap.get(code).push({ tipo, idx });
         }
+        const consec = item.consecutivo;
+        if (consec !== undefined && consec !== null && String(consec).trim() !== '') {
+          const cs = String(consec).trim();
+          consecMap.set(`${tipo}|${cs}`, { tipo, idx });
+          const onlyKey = `|${cs}`;
+          if (!consecMap.has(onlyKey)) consecMap.set(onlyKey, []);
+          consecMap.get(onlyKey).push({ tipo, idx });
+        }
       });
     });
-    byFactura.set(factura, { fileKey, map, codeMap });
+    byFactura.set(factura, { fileKey, map, codeMap, consecMap });
   });
   return byFactura;
 }
@@ -6005,7 +7614,7 @@ function downloadBulkAuthTemplate() {
     return;
   }
   const sep = ';';
-  const header = ['numAutorizacion','numFactura','codigoServicio','fecha'].join(sep);
+  const header = ['numAutorizacion','numFactura','codigoServicio','fecha','nodo','consecutivo'].join(sep);
   const lines = [header];
 
   // Sanitiza un valor para CSV: quita ;, \r, \n
@@ -6031,6 +7640,8 @@ function downloadBulkAuthTemplate() {
           cell(factura),
           cell(code),
           cell(date),
+          cell(tipo),
+          cell(item.consecutivo),
         ].join(sep));
         totalRows++;
       });
@@ -6117,22 +7728,39 @@ function parseAndValidateBulkAuth(text) {
 
   // Detectar cabecera (si existe). Heurística: si el primer registro tiene
   // alguno de los nombres conocidos, lo tratamos como cabecera.
-  const KNOWN_AUTH = /^n(u|ú)m(ero)?\s*autoriz|^numautoriz/i;
-  const KNOWN_FACT = /^n(u|ú)m(ero)?\s*(de\s+)?factur|^numfactur/i;
-  const KNOWN_CODE = /^c(o|ó)d(igo)?(\s*(del\s*)?servic)?|^codigoservicio/i;
-  const KNOWN_DATE = /^fech/i;
+  const KNOWN_AUTH   = /^n(u|ú)m(ero)?\s*autoriz|^numautoriz/i;
+  const KNOWN_FACT   = /^n(u|ú)m(ero)?\s*(de\s+)?factur|^numfactur/i;
+  const KNOWN_CODE   = /^c(o|ó)d(igo)?(\s*(del\s*)?servic)?|^codigoservicio/i;
+  const KNOWN_DATE   = /^fech/i;
+  const KNOWN_NODO   = /^(nodo|tipo|servicio)$/i;
+  const KNOWN_CONSEC = /^(consec(utivo|\.)?|consec)/i;
 
-  let headerCols = null;
+  // Mapeo de columnas: por defecto orden posicional (0..5).
+  let colIdx = { auth: 0, fact: 1, code: 2, date: 3, nodo: 4, consec: 5 };
   let dataStart = 0;
   const first = parsed[0].map(s => String(s || '').trim());
   const isHeader =
     KNOWN_AUTH.test(first[0] || '') ||
     KNOWN_FACT.test(first[1] || '') ||
     KNOWN_CODE.test(first[2] || '') ||
-    KNOWN_DATE.test(first[3] || '');
+    KNOWN_DATE.test(first[3] || '') ||
+    KNOWN_NODO.test(first[4] || '') ||
+    KNOWN_CONSEC.test(first[5] || '');
   if (isHeader) {
-    headerCols = first;
     dataStart = 1;
+    // Permite columnas en cualquier orden si la cabecera está nombrada.
+    const named = { auth: -1, fact: -1, code: -1, date: -1, nodo: -1, consec: -1 };
+    first.forEach((h, i) => {
+      const v = String(h || '').trim();
+      if (named.auth   === -1 && KNOWN_AUTH.test(v))   named.auth   = i;
+      if (named.fact   === -1 && KNOWN_FACT.test(v))   named.fact   = i;
+      if (named.code   === -1 && KNOWN_CODE.test(v))   named.code   = i;
+      if (named.date   === -1 && KNOWN_DATE.test(v))   named.date   = i;
+      if (named.nodo   === -1 && KNOWN_NODO.test(v))   named.nodo   = i;
+      if (named.consec === -1 && KNOWN_CONSEC.test(v)) named.consec = i;
+    });
+    // Solo sobreescribe los índices que se resolvieron por nombre.
+    Object.keys(named).forEach(k => { if (named[k] !== -1) colIdx[k] = named[k]; });
   }
 
   const index = buildBulkAuthIndex();
@@ -6141,12 +7769,14 @@ function parseAndValidateBulkAuth(text) {
   const matchedKeys = new Map(); // `${fileKey}|${tipo}|${idx}` -> [csvRowNumber]
 
   // Construye una fila base con el contexto crudo del CSV
-  const makeBase = (lineNumber, numAuth, numFact, code, date) => ({
+  const makeBase = (lineNumber, numAuth, numFact, code, date, nodoIn = '', consecIn = '') => ({
     lineNumber,
     numAuth,
     numFact,
     code,
     date,
+    nodoIn,                // nodo provisto por el CSV (informativo)
+    consecIn,              // consecutivo provisto por el CSV (informativo)
     status: 'invalid',
     observation: '',
     fileKey: '',
@@ -6178,37 +7808,44 @@ function parseAndValidateBulkAuth(text) {
     return state.files[fileEntry.fileKey].raw.usuarios[0].servicios[pick.tipo][pick.idx];
   };
 
+  const VALID_TIPOS = new Set(BULK_AUTH_TIPOS);
+
   for (let i = dataStart; i < parsed.length; i++) {
     const cols = parsed[i].map(s => String(s || '').trim());
     const lineNumber = i + 1;
-    const numAuth = cols[0] || '';
-    const numFact = cols[1] || '';
-    const code    = cols[2] || '';
-    const dateRaw = cols[3] || '';
-    const date    = toDateOnly(dateRaw);
+    const numAuth   = cols[colIdx.auth]   || '';
+    const numFact   = cols[colIdx.fact]   || '';
+    const code      = cols[colIdx.code]   || '';
+    const dateRaw   = cols[colIdx.date]   || '';
+    const nodoIn    = cols[colIdx.nodo]   || '';
+    const consecIn  = cols[colIdx.consec] || '';
+    const date      = toDateOnly(dateRaw);
 
     // Saltar filas totalmente vacías (defensivo, parseCsvText ya las filtra)
-    if (!numAuth && !numFact && !code && !dateRaw) continue;
+    if (!numAuth && !numFact && !code && !dateRaw && !nodoIn && !consecIn) continue;
 
-    const baseRow = makeBase(lineNumber, numAuth, numFact, code, date);
+    const baseRow = makeBase(lineNumber, numAuth, numFact, code, date, nodoIn, consecIn);
 
-    // Validaciones de formato (fecha es opcional)
-    if (!numFact) {
-      baseRow.observation = 'numFactura vacío';
+    // Validaciones de formato — las 6 columnas son obligatorias para garantizar
+    // unicidad y evitar duplicados.
+    const missing = [];
+    if (!numAuth)  missing.push('numAutorizacion');
+    if (!numFact)  missing.push('numFactura');
+    if (!code)     missing.push('codigoServicio');
+    if (!dateRaw)  missing.push('fecha');
+    if (!nodoIn)   missing.push('nodo');
+    if (!consecIn) missing.push('consecutivo');
+    if (missing.length) {
+      baseRow.observation = `Faltan columna(s) obligatoria(s): ${missing.join(', ')}`;
       rows.push(baseRow); continue;
     }
-    if (!numAuth) {
-      baseRow.observation = 'numAutorizacion vacío';
-      rows.push(baseRow); continue;
-    }
-    if (!code) {
-      baseRow.observation = 'codigoServicio vacío';
-      rows.push(baseRow); continue;
-    }
-    // Si la fecha viene presente pero no es parseable: inválida.
-    // Si está vacía: se acepta y se usa matching por código solamente.
-    if (dateRaw && !date) {
+    // Si la fecha viene pero no es parseable: inválida.
+    if (!date) {
       baseRow.observation = `fecha "${dateRaw}" no reconocida (formatos aceptados: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)`;
+      rows.push(baseRow); continue;
+    }
+    if (!VALID_TIPOS.has(nodoIn)) {
+      baseRow.observation = `nodo "${nodoIn}" desconocido (valores válidos: ${[...VALID_TIPOS].join(', ')})`;
       rows.push(baseRow); continue;
     }
 
@@ -6221,63 +7858,30 @@ function parseAndValidateBulkAuth(text) {
     }
     baseRow.fileKey = fileEntry.fileKey;
 
-    // ─── Caso A: fecha provista → match por (codigo, fecha) ───────────────
-    if (date) {
-      const key = `${code}|${date}`;
-      const candidates = fileEntry.map.get(key);
-      if (!candidates || !candidates.length) {
-        baseRow.status = 'nomatch';
-        baseRow.observation = `Sin coincidencia para código "${code}" + fecha "${date}" en la factura`;
-        rows.push(baseRow); continue;
-      }
-
-      // Si hay múltiples candidatos (mismo código y fecha en el archivo),
-      // tomamos el primero "libre". Si todos están reclamados, reutilizamos
-      // el primero y marcaremos conflicto al final.
-      let pick = candidates.find(c => !matchedKeys.has(`${fileEntry.fileKey}|${c.tipo}|${c.idx}`));
-      if (!pick) pick = candidates[0];
-      const item = claimItem(fileEntry, pick, lineNumber);
-
-      baseRow.tipo = pick.tipo;
-      baseRow.idx = pick.idx;
-      baseRow.currentAuth = item.numAutorizacion;
-      baseRow.consecutivo = item.consecutivo ?? '';
-      baseRow.status = 'ok';
-      baseRow.observation = okObservation(numAuth, item.numAutorizacion);
-      rows.push(baseRow);
-      continue;
-    }
-
-    // ─── Caso B: fecha vacía → match por código en todos los nodos ───────
-    // Comportamiento: se expande la línea del CSV en una fila por cada nodo
-    // del archivo que tenga ese código. Esto permite reemplazar la
-    // autorización para un servicio en bloque sin necesidad de fecha.
-    const codeCandidates = fileEntry.codeMap.get(code);
-    if (!codeCandidates || !codeCandidates.length) {
+    // Match único por (nodo, consecutivo). Garantiza unicidad y elimina
+    // cualquier ambigüedad por filas duplicadas (mismo código+fecha).
+    const pick = fileEntry.consecMap.get(`${nodoIn}|${consecIn}`) || null;
+    if (!pick) {
       baseRow.status = 'nomatch';
-      baseRow.observation = `Sin coincidencia para código "${code}" en la factura (fecha vacía)`;
+      baseRow.observation = `Sin coincidencia para nodo "${nodoIn}" + consecutivo "${consecIn}" en la factura`;
       rows.push(baseRow); continue;
     }
 
-    const total = codeCandidates.length;
-    codeCandidates.forEach((c, idxInExpansion) => {
-      const r = makeBase(lineNumber, numAuth, numFact, code, '');
-      r.fileKey = fileEntry.fileKey;
-      r.expanded = total > 1;
-      const item = claimItem(fileEntry, c, lineNumber);
-      r.tipo = c.tipo;
-      r.idx = c.idx;
-      r.currentAuth = item.numAutorizacion;
-      r.consecutivo = item.consecutivo ?? '';
-      // Mostrar la fecha real del nodo encontrado (informativa, no usada para match)
-      r.date = toDateOnly(getDate(item, c.tipo));
-      r.status = 'ok';
-      const expNote = total > 1
-        ? `expandido (${idxInExpansion + 1} de ${total}) por fecha vacía`
-        : 'sin fecha en CSV: match por código';
-      r.observation = okObservation(numAuth, item.numAutorizacion, expNote);
-      rows.push(r);
-    });
+    const item = claimItem(fileEntry, pick, lineNumber);
+    baseRow.tipo = pick.tipo;
+    baseRow.idx = pick.idx;
+    baseRow.currentAuth = item.numAutorizacion;
+    baseRow.consecutivo = item.consecutivo ?? '';
+
+    // Validación de consistencia: código y fecha del CSV deben coincidir con el JSON.
+    const itemCode = String(getServiceCode(item, pick.tipo) || '').trim();
+    const itemDate = toDateOnly(getDate(item, pick.tipo));
+    const warns = [];
+    if (itemCode && code !== itemCode) warns.push(`código CSV "${code}" ≠ código JSON "${itemCode}"`);
+    if (itemDate && date !== itemDate) warns.push(`fecha CSV "${date}" ≠ fecha JSON "${itemDate}"`);
+    baseRow.status = 'ok';
+    baseRow.observation = okObservation(numAuth, item.numAutorizacion, warns.length ? warns.join('; ') : '');
+    rows.push(baseRow);
   }
 
   // Tras pasar todas las filas, marcar duplicados de destino reclamados por
@@ -6426,12 +8030,13 @@ function exportBulkAuthReport() {
     return;
   }
   const sep = ';';
-  const header = ['linea','numAutorizacion','numFactura','codigoServicio','fecha','archivo','nodo','consecutivo','autorizacionActual','estado','observacion'].join(sep);
+  const header = ['linea','numAutorizacion','numFactura','codigoServicio','fecha','nodoCsv','consecutivoCsv','archivo','nodo','consecutivo','autorizacionActual','estado','observacion'].join(sep);
   const cell = v => String(v == null ? '' : v).replace(/[;\r\n]+/g, ' ').trim();
   const lines = [header];
   bulkAuthState.rows.forEach(r => {
     lines.push([
       r.lineNumber, r.numAuth, r.numFact, r.code, r.date,
+      r.nodoIn || '', r.consecIn || '',
       r.fileKey ? getFilename(r.fileKey) : '',
       r.tipo || '', r.consecutivo, r.currentAuth ?? '',
       r.status, r.observation,
@@ -6553,6 +8158,10 @@ if (typeof window !== 'undefined') {
     confirmDialog: (args) => confirmDialog(args),
     setConfirmDialogStub: (fn) => { confirmDialog = fn; },
     toast: (msg, type) => toast(msg, type),
+    applyOtrosAjustes,
+    bulkClear,
+    bulkApply,
+    bulkReset,
   };
 }
 </script>
